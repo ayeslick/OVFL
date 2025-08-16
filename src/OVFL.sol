@@ -181,6 +181,7 @@ contract OVFL is AccessControl, ReentrancyGuard {
         pendingDelay = PendingTimelockDelay({queued: true, newDelay: newDelay, eta: block.timestamp + wait});
         emit TimelockDelayQueued(newDelay, pendingDelay.eta);
     }
+    
     function executeSetTimelockDelay() external onlyRole(ADMIN_ROLE) {
         require(pendingDelay.queued, "no delay queued");
         require(block.timestamp >= pendingDelay.eta, "timelock not passed");
@@ -267,7 +268,7 @@ contract OVFL is AccessControl, ReentrancyGuard {
         info.ptBalance += ptAmount; // update PT balance using storage pointer
 
         // Price via duration-based oracle (1e18)
-        uint256 rateE18 = pendleOracle.getPtToAssetRate(market, info.twapDurationFixed);
+        uint256 rateE18 = pendleOracle.getPtToAssetRate(market, memInfo.twapDurationFixed);
 
         require(rateE18 <= 1e18, "PT rate cannot exceed par");
         require(rateE18 >= 0.5e18, "PT rate too low"); // Adjust bounds appropriately
@@ -294,7 +295,7 @@ contract OVFL is AccessControl, ReentrancyGuard {
         ovflETH.mint(address(this), toStream);
         _ensureAllowance(IERC20(address(ovflETH)), address(sablierLL), toStream);
 
-        uint256 duration = info.expiryCached - block.timestamp; // >0 by require
+        uint256 duration = memInfo.expiryCached - block.timestamp; // >0 by require
         ISablierV2LockupLinear.CreateWithDurations memory p = ISablierV2LockupLinear.CreateWithDurations({
             sender: address(this),
             recipient: msg.sender,
