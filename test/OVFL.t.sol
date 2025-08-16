@@ -8,10 +8,6 @@ contract OVFLTest is Test {
     OVFL public ovfl;
 
     function setUp() public {
-        ovfl = new OVFL(
-            address(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2),
-            address(0x82aF49447D8a07e3bd95BD0d56f35241523fBab1),
-            address(0x82aF49447D8a07e3bd95BD0d56f35241523fBab1)
-        );
+        ovfl = new OVFL(address(this));
     }
 }
