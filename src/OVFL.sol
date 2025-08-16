@@ -228,6 +228,7 @@ contract OVFL is AccessControl, ReentrancyGuard {
                 }
             }
         }
+        
         require(wethOk, "OVFL: SY cannot redeem to WETH");
 
         // Check TWAP compatibility with market oracle
@@ -379,13 +380,15 @@ contract OVFL is AccessControl, ReentrancyGuard {
         uint256 syReceived = IPYieldToken(yt).redeemPY(address(this));
         
         // Verify we received the expected SY
-        require(IERC20(sy).balanceOf(address(this)) - syBalanceBefore >= syReceived, "OVFL: SY mismatch");
+        uint256 syBalanceAfter = IERC20(sy).balanceOf(address(this));
+        require(syBalanceAfter >= syBalanceBefore + syReceived, "OVFL: SY redemption shortfall");
         
         // Step 2: Redeem SY to wstETH
-        uint256 wethBefore = IERC20(WSTETH).balanceOf(address(this));
+        uint256 wstethBefore = IERC20(WSTETH).balanceOf(address(this));
         _ensureAllowance(IERC20(sy), sy, syReceived);
         IStandardizedYield(sy).redeem(address(this), syReceived, address(WSTETH), 0, false);
-        uint256 redeemed = IERC20(WSTETH).balanceOf(address(this)) - wethBefore;        
+        uint256 wstethAfter = IERC20(WSTETH).balanceOf(address(this));
+        uint256 redeemed = wstethAfter - wstethBefore;        
 
         info.settled = true;
         info.ptBalance = 0;
