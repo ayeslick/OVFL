@@ -359,7 +359,7 @@ contract OVFL is AccessControl, ReentrancyGuard {
         SeriesInfo storage info = series[market]; require(info.approved, "market not approved");
         rateE18 = pendleOracle.getPtToAssetRate(market, info.twapDurationFixed);
     }
-    
+
     function previewStream(address market, uint256 ptOutEstimate)
         external view returns (uint256 toUser, uint256 toStream, uint256 rateE18)
     {
@@ -369,6 +369,4 @@ contract OVFL is AccessControl, ReentrancyGuard {
         if (toUser > ptOutEstimate) toUser = ptOutEstimate;
         toStream = ptOutEstimate - toUser;
     }
-}
-
 }
