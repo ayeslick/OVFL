@@ -26,6 +26,7 @@ import {OVFLETH} from "./OVFLETH.sol";
 // -------- Pendle minimal --------
     interface IPendleMarket {
         function expiry() external view returns (uint256);
+        function increaseObservationsCardinalityNext(uint16 cardinalityNext) external;
 
         function readTokens()
         external
@@ -229,6 +230,22 @@ contract OVFL is AccessControl, ReentrancyGuard {
         }
         require(wethOk, "OVFL: SY cannot redeem to WETH");
 
+        // Check TWAP compatibility with market oracle
+        (bool increaseCardinalityRequired, uint16 cardinalityRequired, ) = 
+            pendleOracle.getOracleState(market, twapSeconds);
+        
+        if (increaseCardinalityRequired) {
+            // Try to increase cardinality if needed
+            try IPendleMarket(market).increaseObservationsCardinalityNext(cardinalityRequired) {
+                // Cardinality increased successfully
+            } catch {
+                revert("OVFL: cannot increase oracle cardinality");
+            }
+        }
+        
+        // Note: We don't check oldestObservationSatisfied here because new markets
+        // need time to accumulate data. This will be checked in executeAddMarket.
+
         uint256 wait = timelockDelaySeconds; // 0 => instant first-time onboarding
         pend.queued = true;
         pend.twapDuration = twapSeconds;
@@ -389,6 +406,30 @@ contract OVFL is AccessControl, ReentrancyGuard {
     // --- View ---
     function claimable() external view returns (uint256) {
         return settledAsset - totalClaimed;
+    }
+
+    /// @notice Check if a market supports the specified TWAP duration
+    /// @param market The Pendle market address to check
+    /// @param twapDuration The desired TWAP duration in seconds
+    /// @return isSupported Whether the market can support this TWAP duration
+    /// @return needsCardinalityIncrease Whether oracle cardinality needs to be increased
+    /// @return hasEnoughData Whether there's enough historical data for the TWAP
+    /// @return cardinalityRequired The cardinality needed if increase is required
+    function checkTWAPCompatibility(address market, uint32 twapDuration) 
+        external 
+        view 
+        returns (
+            bool isSupported,
+            bool needsCardinalityIncrease, 
+            bool hasEnoughData,
+            uint16 cardinalityRequired
+        ) 
+    {
+        (needsCardinalityIncrease, cardinalityRequired, hasEnoughData) = 
+            pendleOracle.getOracleState(market, twapDuration);
+        
+        // Market is supported if cardinality is sufficient and data is available
+        isSupported = !needsCardinalityIncrease && hasEnoughData;
     }
 
       // --- Approved markets views ---
