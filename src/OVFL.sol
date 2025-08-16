@@ -228,4 +228,119 @@ contract OVFL is AccessControl, ReentrancyGuard {
         emit MarketApproved(market, true, info.twapDurationFixed, expiry);
     }
 
+    // --- Internal helper ---
+    function _ensureAllowance(IERC20 token, address spender, uint256 needed) internal {
+        if (token.allowance(address(this), spender) < needed) {
+            token.approve(spender, type(uint256).max);
+        }
+    }
+
+    // --- Wrap 1:1 ---
+    function wrap(uint256 amount, address to) external nonReentrant {
+        require(to != address(0), "bad to");
+        require(amount > 0, "zero amount");
+        WETH.safeTransferFrom(msg.sender, address(this), amount);
+        settledWeth += amount; // back new ovflETH 1:1
+        ovflETH.mint(to, amount);
+    }
+
+     function deposit(address market, uint256 ptAmount)
+        external
+        nonReentrant
+        returns (uint256 toUser, uint256 toStream, uint256 streamId)
+    {
+        SeriesInfo storage info = series[market];
+        require(info.approved, "market not approved");
+        require(ptAmount > 0, "zero amount");
+        require(block.timestamp < info.expiryCached, "matured");
+
+        // Pull PTs and update holdings
+        address pt = IPendleMarket(market).pt();
+        IERC20(pt).safeTransferFrom(msg.sender, address(this), ptAmount);
+        info.ptBalance += ptAmount;
+
+        // Price via duration-based oracle (1e18)
+        uint256 rateE18 = pendleOracle.getPtToAssetRate(market, info.twapDurationFixed);
+        toUser   = PRBMath.mulDiv(ptAmount, rateE18, 1e18);
+        if (toUser > ptAmount) toUser = ptAmount;
+        toStream = ptAmount - toUser;
+
+        // Must create a stream
+        require(toStream > 0, "nothing to stream");
+
+        // FEE on MARKET VALUE (WETH): toUser * feeBps / 10_000
+        uint256 feeAmountWeth = PRBMath.mulDiv(toUser, feeBps, 10_000);
+
+        if (feeAmountWeth > 0) {
+            IERC20(WETH).safeTransferFrom(msg.sender, TREASURY_ADDR, feeAmountWeth);
+            emit FeeTaken(msg.sender, address(WETH), feeAmountWeth);
+        }
+
+        // Mint immediate portion to user
+        ovflETH.mint(msg.sender, toUser);
+
+        // Stream remainder to expiry (no uint128 bound check; cast only)
+        ovflETH.mint(address(this), toStream);
+        _ensureAllowance(IERC20(address(ovflETH)), address(sablierLL), toStream);
+
+        uint256 duration = info.expiryCached - block.timestamp; // >0 by require
+        ISablierV2LockupLinear.CreateWithDurations memory p = ISablierV2LockupLinear.CreateWithDurations({
+            sender: address(this),
+            recipient: msg.sender,
+            asset: IERC20(address(ovflETH)),
+            totalAmount: uint128(toStream),
+            startTime: uint40(block.timestamp),
+            cliffDuration: 0,
+            totalDuration: uint40(duration),
+            cancelable: false,
+            transferable: true
+        });
+        streamId = sablierLL.createWithDurations(p);
+    }
+
+    function settleMarket(address market) external nonReentrant {
+        SeriesInfo storage info = series[market];
+        require(info.approved, "market not approved");
+        require(!info.settled, "already settled");
+        require(info.ptBalance > 0, "no PT");
+        require(block.timestamp >= info.expiryCached, "not matured");
+
+        uint256 ptAmount = info.ptBalance;
+        address pt = IPendleMarket(market).pt();
+        _ensureAllowance(IERC20(pt), address(pendleRouter), ptAmount);
+
+        uint256 minOut = ptAmount > dustTolerance ? (ptAmount - dustTolerance) : ptAmount;
+
+        IPendleRouter.TokenOutput memory out = IPendleRouter.TokenOutput({
+            tokenOut: address(WETH),
+            minTokenOut: minOut,
+            tokenRedeemSy: address(WETH),
+            pendleSwap: address(0),
+            swapData: IPendleRouter.SwapData({data:""})
+        });
+
+        uint256 before = IERC20(WETH).balanceOf(address(this));
+        pendleRouter.redeemPyToToken(address(this), market, out);
+        uint256 redeemed = IERC20(WETH).balanceOf(address(this)) - before;
+        require(redeemed >= minOut, "redeem shortfall");
+
+        info.settled = true;
+        info.ptBalance = 0;
+        settledWeth += redeemed;
+
+        emit Settled(market, redeemed);
+    }
+
+    function claim(uint256 amount) external nonReentrant {
+        uint256 claimableNow = settledWeth - totalClaimed;
+        require(amount > 0 && amount <= claimableNow, "insufficient settled");
+        ovflETH.burn(msg.sender, amount);
+        totalClaimed += amount;
+        IERC20(WETH).safeTransfer(msg.sender, amount);
+        emit Claimed(msg.sender, amount, amount);
+    }
+    function claimable() external view returns (uint256) {
+        return settledWeth - totalClaimed;
+    }
+
 }
