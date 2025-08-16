@@ -73,16 +73,25 @@ import {OVFLETH} from "./OVFLETH.sol";
 
     // -------- Sablier V2 Lockup Linear (minimal) --------
     interface ISablierV2LockupLinear {
+        struct Durations {
+            uint40 cliff;
+            uint40 total;
+        }
+
+        struct Broker {
+            address account;
+            uint256 fee; // UD60x18 formatted
+        }
+
         struct CreateWithDurations {
-            address sender; 
-            address recipient; 
-            IERC20 asset; 
+            address sender;
+            address recipient;
             uint128 totalAmount;
-            uint40 startTime; 
-            uint40 cliffDuration; 
-            uint40 totalDuration; 
-            bool cancelable; 
+            IERC20 asset;
+            bool cancelable;
             bool transferable;
+            Durations durations;
+            Broker broker;
         }
 
         function createWithDurations(CreateWithDurations calldata params) external returns (uint256 streamId);
@@ -142,7 +151,7 @@ contract OVFL is AccessControl, ReentrancyGuard {
     address private TREASURY_ADDR; // immutable fee recipient
     
     IPendleOracle public immutable pendleOracle = IPendleOracle(0x9a9Fa8338dd5E5B2188006f1Cd2Ef26d921650C2);
-    ISablierV2LockupLinear public immutable sablierLL = ISablierV2LockupLinear(0x3333333333333333333333333333333333333333);
+    ISablierV2LockupLinear public immutable sablierLL = ISablierV2LockupLinear(0x3962f6585946823440d274aD7C719B02b49DE51E);
     IERC20 public immutable WSTETH = IERC20(0x7f39C581F595B53c5cb19bD0b3f8dA6c935E2Ca0);
     OVFLETH public immutable ovflETH;
 
@@ -314,13 +323,18 @@ contract OVFL is AccessControl, ReentrancyGuard {
         ISablierV2LockupLinear.CreateWithDurations memory p = ISablierV2LockupLinear.CreateWithDurations({
             sender: address(this),
             recipient: msg.sender,
-            asset: IERC20(address(ovflETH)),
             totalAmount: uint128(toStream),
-            startTime: uint40(block.timestamp),
-            cliffDuration: 0,
-            totalDuration: uint40(duration),
+            asset: IERC20(address(ovflETH)),
             cancelable: false,
-            transferable: true
+            transferable: true,
+            durations: ISablierV2LockupLinear.Durations({
+                cliff: 0,
+                total: uint40(duration)
+            }),
+            broker: ISablierV2LockupLinear.Broker({
+                account: address(0),
+                fee: 0
+            })
         });
         streamId = sablierLL.createWithDurations(p);
     }

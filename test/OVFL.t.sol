@@ -33,7 +33,7 @@ contract OVFLTest is Test {
 
     }
 
-    function est_Deposit_Success() public {
+    function test_Deposit_Success() public {
         address user = makeAddr("user");
         uint256 ptAmount = 10 ether;
         uint256 feeAmount = 0.3 ether; // 3% fee on market value
@@ -77,7 +77,7 @@ contract OVFLTest is Test {
         
         // Verify ovflETH minting
         assertEq(ovfl.ovflETH().balanceOf(user), userOvflEthBalanceBefore + actualToUser, "User should receive ovflETH");
-        assertEq(ovfl.ovflETH().balanceOf(address(ovfl)), actualToStream, "Vault should hold stream amount");
+        assertEq(ovfl.ovflETH().balanceOf(address(ovfl)), 0, "Vault should not hold tokens after stream creation");
         
         // Verify stream creation
         assertGt(streamId, 0, "Stream ID should be created");
