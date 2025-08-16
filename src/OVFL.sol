@@ -98,6 +98,8 @@ contract OVFL is AccessControl, ReentrancyGuard {
     uint256 public constant FEE_MAX_BPS = 1_000; // 10% max
     uint256 public constant MIN_DELAY_SECONDS = 1 hours;
     uint256 public constant MAX_DELAY_SECONDS = 7 days;
+    uint256 public constant MIN_TWAP_DURATION = 1 hours;
+    uint256 public constant MAX_TWAP_DURATION = 7 days;
     
     PendingTimelockDelay public pendingDelay;
     // Fees
@@ -198,7 +200,7 @@ contract OVFL is AccessControl, ReentrancyGuard {
     // --- Timelocked market onboarding ---
     function queueAddMarket(address market, uint32 twapSeconds) external onlyRole(ADMIN_ROLE) {
         require(market != address(0), "OVFL: market is zero address");
-        require(twapSeconds > 0, "OVFL: twap is zero");
+        require(twapSeconds >= MIN_TWAP_DURATION && twapSeconds <= MAX_TWAP_DURATION, "OVFL: twap bounds");
 
         PendingMarket storage pend = pendingMarkets[market];
         require(!pend.queued, "OVFL: already queued");
