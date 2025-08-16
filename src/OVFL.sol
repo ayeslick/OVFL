@@ -93,6 +93,11 @@ contract OVFL is AccessControl, ReentrancyGuard {
     uint256 public dustTolerance = 1; // in wei
      // Timelock (self-timelocked delay; 0 => instant first-time changes)
     uint256 public timelockDelaySeconds; // 0 until first execute
+
+    uint256 public constant MAX_DUST_TOLERANCE = 0.01e18; // 1% max
+    uint256 public constant FEE_MAX_BPS = 1_000; // 10% max
+    uint256 public constant MIN_DELAY_SECONDS = 1 hours;
+    uint256 public constant MAX_DELAY_SECONDS = 7 days;
     
     PendingTimelockDelay public pendingDelay;
     // Fees
@@ -160,14 +165,14 @@ contract OVFL is AccessControl, ReentrancyGuard {
 
      // --- Admin: fee bps only (treasury is immutable) ---
     function setFee(uint16 newFeeBps) external onlyRole(ADMIN_ROLE) {
-        require(newFeeBps <= 1_000, "fee >10%");
+        require(newFeeBps <= FEE_MAX_BPS, "OVFL: fee >10%");
         feeBps = newFeeBps;
         emit FeeUpdated(newFeeBps, TREASURY_ADDR);
     }
 
     // --- Admin: adjustable dust tolerance (no timelock) ---
     function setDustTolerance(uint256 newDust) external onlyRole(ADMIN_ROLE) {
-        require(newDust <= 0.01e18, "dust tolerance max 1%"); // 1% max
+        require(newDust <= MAX_DUST_TOLERANCE, "OVFL: dust tolerance max 1%"); // 1% max
         dustTolerance = newDust;
         emit DustToleranceUpdated(dustTolerance, newDust);
     }
@@ -175,16 +180,16 @@ contract OVFL is AccessControl, ReentrancyGuard {
     // --- Timelock delay (self-timelocked) ---
     /// If current delay is 0, the queued change is instantaneous (eta = now).
     function queueSetTimelockDelay(uint256 newDelay) external onlyRole(ADMIN_ROLE) {
-        require(newDelay >= 1 hours && newDelay <= 7 days, "delay bounds");
-        require(!pendingDelay.queued, "delay queued");
+        require(newDelay >= MIN_DELAY_SECONDS && newDelay <= MAX_DELAY_SECONDS, "OVFL: delay bounds");
+        require(!pendingDelay.queued, "OVFL: delay queued");
         uint256 wait = (timelockDelaySeconds == 0) ? 0 : timelockDelaySeconds;
         pendingDelay = PendingTimelockDelay({queued: true, newDelay: newDelay, eta: block.timestamp + wait});
         emit TimelockDelayQueued(newDelay, pendingDelay.eta);
     }
-    
+
     function executeSetTimelockDelay() external onlyRole(ADMIN_ROLE) {
-        require(pendingDelay.queued, "no delay queued");
-        require(block.timestamp >= pendingDelay.eta, "timelock not passed");
+        require(pendingDelay.queued, "OVFL: no delay queued");
+        require(block.timestamp >= pendingDelay.eta, "OVFL: timelock not passed");
         timelockDelaySeconds = pendingDelay.newDelay;
         delete pendingDelay;
         emit TimelockDelayExecuted(timelockDelaySeconds);
@@ -192,20 +197,25 @@ contract OVFL is AccessControl, ReentrancyGuard {
 
     // --- Timelocked market onboarding ---
     function queueAddMarket(address market, uint32 twapSeconds) external onlyRole(ADMIN_ROLE) {
-        require(market != address(0), "market=0");
-        require(twapSeconds > 0, "bad twap");
+        require(market != address(0), "OVFL: market is zero address");
+        require(twapSeconds > 0, "OVFL: twap is zero");
 
         PendingMarket storage pend = pendingMarkets[market];
-        require(!pend.queued, "already queued");
+        require(!pend.queued, "OVFL: already queued");
 
         // Check SY→WETH redeemability once (here)
         address sy = IPendleMarket(market).sy();
         bool wethOk;
         {
             address[] memory outs = IStandardizedYield(sy).getTokensOut();
-            for (uint256 i; i < outs.length; ++i) if (outs[i] == address(WETH)) { wethOk = true; break; }
+            for (uint256 i; i < outs.length; ++i) {
+                if (outs[i] == address(WETH)) { 
+                    wethOk = true;
+                     break; 
+                }
+            }
         }
-        require(wethOk, "SY cannot redeem to WETH");
+        require(wethOk, "OVFL: SY cannot redeem to WETH");
 
         uint256 wait = timelockDelaySeconds; // 0 => instant first-time onboarding
         pend.queued = true;
@@ -217,11 +227,11 @@ contract OVFL is AccessControl, ReentrancyGuard {
 
     function executeAddMarket(address market) external onlyRole(ADMIN_ROLE) {
         PendingMarket storage pend = pendingMarkets[market];
-        require(pend.queued, "not queued");
-        require(block.timestamp >= pend.eta, "timelock not passed");
+        require(pend.queued, "OVFL: not queued");
+        require(block.timestamp >= pend.eta, "OVFL: timelock not passed");
 
         SeriesInfo storage info = series[market];
-        require(!info.approved, "already added");
+        require(!info.approved, "OVFL: already added");
 
         uint256 expiry = IPendleMarket(market).expiry(); // cache (no SY→WETH recheck)
         info.approved = true;
@@ -243,8 +253,8 @@ contract OVFL is AccessControl, ReentrancyGuard {
 
     // --- Wrap 1:1 ---
     function wrap(uint256 amount, address to) external nonReentrant {
-        require(to != address(0), "bad to");
-        require(amount > 0, "zero amount");
+        require(to != address(0), "OVFL: to is zero address");
+        require(amount > 0, "OVFL: amount is zero");
         WETH.safeTransferFrom(msg.sender, address(this), amount);
         settledWeth += amount; // back new ovflETH 1:1
         ovflETH.mint(to, amount);
@@ -258,9 +268,9 @@ contract OVFL is AccessControl, ReentrancyGuard {
         SeriesInfo storage info = series[market];
         SeriesInfo memory memInfo = info;
         // Check market is approved
-        require(memInfo.approved, "market not approved");
-        require(ptAmount > 0, "zero amount");
-        require(block.timestamp < memInfo.expiryCached, "matured");
+        require(memInfo.approved, "OVFL: market not approved");
+        require(ptAmount > 0, "OVFL: amount is zero");
+        require(block.timestamp < memInfo.expiryCached, "OVFL: matured");
 
         // Pull PTs and update holdings
         address pt = IPendleMarket(market).pt();
@@ -270,15 +280,15 @@ contract OVFL is AccessControl, ReentrancyGuard {
         // Price via duration-based oracle (1e18)
         uint256 rateE18 = pendleOracle.getPtToAssetRate(market, memInfo.twapDurationFixed);
 
-        require(rateE18 <= 1e18, "PT rate cannot exceed par");
-        require(rateE18 >= 0.5e18, "PT rate too low"); // Adjust bounds appropriately
+        require(rateE18 <= 1e18, "OVFL: PT rate cannot exceed par");
+        require(rateE18 >= 0.5e18, "OVFL: PT rate too low"); // Adjust bounds appropriately
 
         toUser   = PRBMath.mulDiv(ptAmount, rateE18, 1e18);
         if (toUser > ptAmount) toUser = ptAmount;
         toStream = ptAmount - toUser;
 
         // Must create a stream
-        require(toStream > 0, "nothing to stream");
+        require(toStream > 0, "OVFL: nothing to stream");
 
         // FEE on MARKET VALUE (WETH): toUser * feeBps / 10_000
         uint256 feeAmountWeth = PRBMath.mulDiv(toUser, feeBps, 10_000);
@@ -312,10 +322,10 @@ contract OVFL is AccessControl, ReentrancyGuard {
 
     function settleMarket(address market) external nonReentrant {
         SeriesInfo storage info = series[market];
-        require(info.approved, "market not approved");
-        require(!info.settled, "already settled");
-        require(info.ptBalance > 0, "no PT");
-        require(block.timestamp >= info.expiryCached, "not matured");
+        require(info.approved, "OVFL: market not approved");
+        require(!info.settled, "OVFL: already settled");
+        require(info.ptBalance > 0, "OVFL: no PT");
+        require(block.timestamp >= info.expiryCached, "OVFL: not matured");
 
         uint256 ptAmount = info.ptBalance;
         address pt = IPendleMarket(market).pt();
@@ -334,7 +344,7 @@ contract OVFL is AccessControl, ReentrancyGuard {
         uint256 before = IERC20(WETH).balanceOf(address(this));
         pendleRouter.redeemPyToToken(address(this), market, out);
         uint256 redeemed = IERC20(WETH).balanceOf(address(this)) - before;
-        require(redeemed >= minOut, "redeem shortfall");
+        require(redeemed >= minOut, "OVFL: redeem shortfall");
 
         info.settled = true;
         info.ptBalance = 0;
@@ -345,7 +355,7 @@ contract OVFL is AccessControl, ReentrancyGuard {
 
     function claim(uint256 amount) external nonReentrant {
         uint256 claimableNow = settledWeth - totalClaimed;
-        require(amount > 0 && amount <= claimableNow, "insufficient settled");
+        require(amount > 0 && amount <= claimableNow, "OVFL: insufficient settled");
         ovflETH.burn(msg.sender, amount);
         totalClaimed += amount;
         IERC20(WETH).safeTransfer(msg.sender, amount);
