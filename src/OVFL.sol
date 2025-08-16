@@ -255,14 +255,16 @@ contract OVFL is AccessControl, ReentrancyGuard {
         returns (uint256 toUser, uint256 toStream, uint256 streamId)
     {
         SeriesInfo storage info = series[market];
-        require(info.approved, "market not approved");
+        SeriesInfo memory memInfo = series[market];
+        // Check market is approved
+        require(memInfo.approved, "market not approved");
         require(ptAmount > 0, "zero amount");
-        require(block.timestamp < info.expiryCached, "matured");
+        require(block.timestamp < memInfo.expiryCached, "matured");
 
         // Pull PTs and update holdings
         address pt = IPendleMarket(market).pt();
         IERC20(pt).safeTransferFrom(msg.sender, address(this), ptAmount);
-        info.ptBalance += ptAmount;
+        info.ptBalance += ptAmount; // update PT balance using storage pointer
 
         // Price via duration-based oracle (1e18)
         uint256 rateE18 = pendleOracle.getPtToAssetRate(market, info.twapDurationFixed);
