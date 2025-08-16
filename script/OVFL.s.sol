@@ -12,7 +12,7 @@ contract OVFLScript is Script {
     function run() public {
         vm.startBroadcast();
 
-        ovfl = new OVFL(address(this));
+        ovfl = new OVFL(address(this), address(this));
 
         vm.stopBroadcast();
     }

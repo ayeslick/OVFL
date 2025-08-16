@@ -8,6 +8,6 @@ contract OVFLTest is Test {
     OVFL public ovfl;
 
     function setUp() public {
-        ovfl = new OVFL(address(this));
+        ovfl = new OVFL(address(this), address(this));
     }
 }

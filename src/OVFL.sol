@@ -82,7 +82,7 @@ contract OVFL is AccessControl, ReentrancyGuard {
     address constant PENDLE_ORACLE_ADDR  = 0x2222222222222222222222222222222222222222;
     address constant SABLIER_LINEAR_ADDR = 0x3333333333333333333333333333333333333333;
     address constant WETH_ADDR           = 0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2;
-    address private TREASURY_ADDR        = address(this); // immutable fee recipient
+    address private TREASURY_ADDR; // immutable fee recipient
 
     // Roles
     bytes32 public constant ADMIN_ROLE = DEFAULT_ADMIN_ROLE;
@@ -142,15 +142,20 @@ contract OVFL is AccessControl, ReentrancyGuard {
     event TimelockDelayExecuted(uint256 newDelay);
     event DustToleranceUpdated(uint256 oldDust, uint256 newDust);
 
-    constructor(address admin) {
+    constructor(address admin, address treasury) {
 
         // Set admin
         require(admin != address(0), "OVFL: admin is zero address");
         _grantRole(ADMIN_ROLE, admin);
 
+        // Set treasury
+        require(treasury != address(0), "OVFL: treasury is zero address");
+        TREASURY_ADDR = treasury;
+
         // Deploy ovflETH and hand ownership to this contract
         ovflETH = new OVFLETH();
         ovflETH.transferOwnership(address(this));
+
     }
 
      // --- Admin: fee bps only (treasury is immutable) ---
@@ -162,9 +167,9 @@ contract OVFL is AccessControl, ReentrancyGuard {
 
     // --- Admin: adjustable dust tolerance (no timelock) ---
     function setDustTolerance(uint256 newDust) external onlyRole(ADMIN_ROLE) {
-        uint256 old = dustTolerance;
+        require(newDust <= 0.01e18, "dust tolerance max 1%"); // 1% max
         dustTolerance = newDust;
-        emit DustToleranceUpdated(old, newDust);
+        emit DustToleranceUpdated(dustTolerance, newDust);
     }
 
     // --- Timelock delay (self-timelocked) ---
@@ -261,6 +266,10 @@ contract OVFL is AccessControl, ReentrancyGuard {
 
         // Price via duration-based oracle (1e18)
         uint256 rateE18 = pendleOracle.getPtToAssetRate(market, info.twapDurationFixed);
+
+        require(rateE18 <= 1e18, "PT rate cannot exceed par");
+        require(rateE18 >= 0.5e18, "PT rate too low"); // Adjust bounds appropriately
+
         toUser   = PRBMath.mulDiv(ptAmount, rateE18, 1e18);
         if (toUser > ptAmount) toUser = ptAmount;
         toStream = ptAmount - toUser;
