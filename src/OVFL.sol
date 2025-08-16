@@ -339,8 +339,36 @@ contract OVFL is AccessControl, ReentrancyGuard {
         IERC20(WETH).safeTransfer(msg.sender, amount);
         emit Claimed(msg.sender, amount, amount);
     }
+
+    // --- View ---
     function claimable() external view returns (uint256) {
         return settledWeth - totalClaimed;
     }
+
+      // --- Approved markets views ---
+    function getApprovedMarkets() external view returns (address[] memory) { 
+        return _approvedMarkets; 
+    }
+
+    function approvedMarketsCount() external view returns (uint256) { 
+        return _approvedMarkets.length; 
+    }
+
+    // --- Previews (duration-based pricing, no swap previews here) ---
+    function previewRate(address market) external view returns (uint256 rateE18) {
+        SeriesInfo storage info = series[market]; require(info.approved, "market not approved");
+        rateE18 = pendleOracle.getPtToAssetRate(market, info.twapDurationFixed);
+    }
+    
+    function previewStream(address market, uint256 ptOutEstimate)
+        external view returns (uint256 toUser, uint256 toStream, uint256 rateE18)
+    {
+        SeriesInfo storage info = series[market]; require(info.approved, "market not approved");
+        rateE18 = pendleOracle.getPtToAssetRate(market, info.twapDurationFixed);
+        toUser  = PRBMath.mulDiv(ptOutEstimate, rateE18, 1e18);
+        if (toUser > ptOutEstimate) toUser = ptOutEstimate;
+        toStream = ptOutEstimate - toUser;
+    }
+}
 
 }
