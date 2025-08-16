@@ -255,7 +255,7 @@ contract OVFL is AccessControl, ReentrancyGuard {
         returns (uint256 toUser, uint256 toStream, uint256 streamId)
     {
         SeriesInfo storage info = series[market];
-        SeriesInfo memory memInfo = series[market];
+        SeriesInfo memory memInfo = info;
         // Check market is approved
         require(memInfo.approved, "market not approved");
         require(ptAmount > 0, "zero amount");
