@@ -55,7 +55,7 @@ contract OVFLTest is Test {
         uint256 userOvflEthBalanceBefore = ovfl.ovflETH().balanceOf(user);
         
         // Preview the deposit to get expected values
-        (uint256 expectedToUser, uint256 expectedToStream, uint256 expectedRate) = ovfl.previewStream(PENDLE_MARKET, ptAmount);
+        (uint256 expectedToUser, uint256 expectedToStream, ) = ovfl.previewStream(PENDLE_MARKET, ptAmount);
         
         // Execute deposit
         (uint256 actualToUser, uint256 actualToStream, uint256 streamId) = ovfl.deposit(PENDLE_MARKET, ptAmount);
@@ -83,7 +83,7 @@ contract OVFLTest is Test {
         assertGt(streamId, 0, "Stream ID should be created");
         
         // Verify vault state update
-        (bool approved, bool settled, uint32 twapDuration, uint256 ptBalance, uint256 expiry) = ovfl.series(PENDLE_MARKET);
+        (, , , uint256 ptBalance, ) = ovfl.series(PENDLE_MARKET);
         assertEq(ptBalance, ptAmount, "Vault PT balance should be updated");
     }
     

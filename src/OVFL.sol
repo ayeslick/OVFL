@@ -111,7 +111,7 @@ contract OVFL is AccessControl, ReentrancyGuard {
 
     uint256 public constant FEE_MAX_BPS = 1_000; // 10% max
     uint256 public constant MIN_DELAY_SECONDS = 1 hours;
-    uint256 public constant MAX_DELAY_SECONDS = 7 days;
+    uint256 public constant MAX_DELAY_SECONDS = 2 days;
     uint256 public constant MIN_TWAP_DURATION = 15 minutes;
     uint256 public constant MAX_TWAP_DURATION = 30 minutes;
     uint256 public constant BASIS_POINTS = 10_000;
@@ -195,7 +195,7 @@ contract OVFL is AccessControl, ReentrancyGuard {
     function queueSetTimelockDelay(uint256 newDelay) external onlyRole(ADMIN_ROLE) {
         require(newDelay >= MIN_DELAY_SECONDS && newDelay <= MAX_DELAY_SECONDS, "OVFL: delay bounds");
         require(!pendingDelay.queued, "OVFL: delay queued");
-        uint256 wait = (timelockDelaySeconds == 0) ? 0 : timelockDelaySeconds;
+        uint256 wait = timelockDelaySeconds;
         pendingDelay = PendingTimelockDelay({queued: true, newDelay: newDelay, eta: block.timestamp + wait});
         emit TimelockDelayQueued(newDelay, pendingDelay.eta);
     }
@@ -215,6 +215,14 @@ contract OVFL is AccessControl, ReentrancyGuard {
 
         PendingMarket storage pend = pendingMarkets[market];
         require(!pend.queued, "OVFL: already queued");
+        
+        // Auto-enable timelock after first market (if not already set)
+        bool isFirstMarket = (_approvedMarkets.length == 0 && timelockDelaySeconds == 0);
+
+        if (isFirstMarket) {
+            timelockDelaySeconds = MIN_DELAY_SECONDS; // Auto-set to minimum delay
+            emit TimelockDelayExecuted(MIN_DELAY_SECONDS);
+        }
 
         // Check SY→WETH redeemability once (here)
         (address sy, , ) = IPendleMarket(market).readTokens();
@@ -247,7 +255,8 @@ contract OVFL is AccessControl, ReentrancyGuard {
         // Note: We don't check oldestObservationSatisfied here because new markets
         // need time to accumulate data. This will be checked in executeAddMarket.
 
-        uint256 wait = timelockDelaySeconds; // 0 => instant first-time onboarding
+        // First market gets instant execution, subsequent markets use timelock delay
+        uint256 wait = isFirstMarket ? 0 : timelockDelaySeconds;
         pend.queued = true;
         pend.twapDuration = twapSeconds;
         pend.eta = block.timestamp + wait;
@@ -359,12 +368,13 @@ contract OVFL is AccessControl, ReentrancyGuard {
 
     function settleMarket(address market) external nonReentrant {
         SeriesInfo storage info = series[market];
-        require(info.approved, "OVFL: market not approved");
-        require(!info.settled, "OVFL: already settled");
-        require(info.ptBalance > 0, "OVFL: no PT");
-        require(block.timestamp >= info.expiryCached, "OVFL: not matured");
+        SeriesInfo memory memInfo = info;
+        require(memInfo.approved, "OVFL: market not approved");
+        require(!memInfo.settled, "OVFL: already settled");
+        require(memInfo.ptBalance > 0, "OVFL: no PT");
+        require(block.timestamp >= memInfo.expiryCached, "OVFL: not matured");
 
-        uint256 ptAmount = info.ptBalance;
+        uint256 ptAmount = memInfo.ptBalance;
         
         // Get PT, SY, and YT contracts from market
         (address sy, address pt, address yt) = IPendleMarket(market).readTokens();
@@ -443,17 +453,18 @@ contract OVFL is AccessControl, ReentrancyGuard {
     function approvedMarketsCount() external view returns (uint256) { 
         return _approvedMarkets.length; 
     }
-
-    // --- Previews (duration-based pricing, no swap previews here) ---
+    
     function previewRate(address market) external view returns (uint256 rateE18) {
-        SeriesInfo storage info = series[market]; require(info.approved, "market not approved");
+        SeriesInfo memory info = series[market]; 
+        require(info.approved, "market not approved");
         rateE18 = pendleOracle.getPtToSyRate(market, info.twapDurationFixed);
     }
 
     function previewStream(address market, uint256 ptAmount)
         external view returns (uint256 toUser, uint256 toStream, uint256 rateE18)
     {
-        SeriesInfo storage info = series[market]; require(info.approved, "market not approved");
+        SeriesInfo memory info = series[market]; 
+        require(info.approved, "market not approved");
         rateE18 = pendleOracle.getPtToSyRate(market, info.twapDurationFixed);
         toUser  = PRBMath.mulDiv(ptAmount, rateE18, 1e18);
         if (toUser > ptAmount) toUser = ptAmount;
