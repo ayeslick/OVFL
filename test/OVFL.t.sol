@@ -82,9 +82,6 @@ contract OVFLTest is Test {
         // Verify stream creation
         assertGt(streamId, 0, "Stream ID should be created");
         
-        // Verify vault state update
-        (, , , uint256 ptBalance, ) = ovfl.series(PENDLE_MARKET);
-        assertEq(ptBalance, ptAmount, "Vault PT balance should be updated");
     }
     
 //     function test_Deposit_RevertWhenMarketNotApproved() public {

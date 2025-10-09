@@ -12,7 +12,15 @@ contract OVFLScript is Script {
     function run() public {
         vm.startBroadcast();
 
-        ovfl = new OVFL(address(this), address(this));
+        // Get the deployer address
+        address deployer = vm.addr(vm.envUint("PRIVATE_KEY"));
+        
+        // Deploy OVFL with deployer as admin and treasury
+        ovfl = new OVFL(deployer, deployer);
+
+        console.log("OVFL deployed to:", address(ovfl));
+        console.log("Admin:", deployer);
+        console.log("Treasury:", deployer);
 
         vm.stopBroadcast();
     }

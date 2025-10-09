@@ -4,19 +4,15 @@ pragma solidity ^0.8.20;
 /**
  * Pendle Basket (PT-only) Vault with ovflETH wrapper, market-value fee on PT deposits,
  * per-market fixed TWAP (duration), timelocked market onboarding (self-timelocked delay),
- * PUBLIC settlement with adjustable dust guard (no slippage semantics),
  * Sablier V2 Lockup Linear streaming for the “excess”, duration-based Oracle pricing,
  * and an approved-markets registry.
  *
  * Core flows:
- * - wrap: WETH -> ovflETH at 1:1, credits settledWeth (immediate redeemability).
  * - deposit: user supplies PT pre-maturity; fee on MARKET VALUE (in WETH); must create a stream.
- * - settleMarket: public; after maturity; redeem PT->WETH ~1:1 with tiny dust guard.
- * - claim: burn pETH, withdraw WETH from the settled pool.
+ * - claim: after maturity, burn ovflETH to withdraw the corresponding PTs for redemption elsewhere.
  */
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -103,10 +99,7 @@ contract OVFL is AccessControl, ReentrancyGuard {
 
     // Roles
     bytes32 public constant ADMIN_ROLE = DEFAULT_ADMIN_ROLE;
-     // Redemption pool
-    uint256 public settledAsset;      // WETH available for claims
-    uint256 public totalClaimed;     // WETH already paid out
-     // Timelock (self-timelocked delay; 0 => instant first-time changes)
+    // Timelock (self-timelocked delay; 0 => instant first-time changes)
     uint256 public timelockDelaySeconds; // 0 until first execute
 
     uint256 public constant FEE_MAX_BPS = 1_000; // 10% max
@@ -127,9 +120,7 @@ contract OVFL is AccessControl, ReentrancyGuard {
     // Market state
     struct SeriesInfo {
         bool    approved;            // set at executeAddMarket()
-        bool    settled;             // after PT->WETH redemption
         uint32  twapDurationFixed;   // frozen on add
-        uint256 ptBalance;           // PT held by vault
         uint256 expiryCached;        // cached on add
     }
     struct PendingMarket { 
@@ -147,6 +138,7 @@ contract OVFL is AccessControl, ReentrancyGuard {
     // Market state
     mapping(address => SeriesInfo) public series;
     mapping(address => PendingMarket) public pendingMarkets;
+    mapping(address => address) public ptToMarket; // PT token -> market
 
     
     address private TREASURY_ADDR; // immutable fee recipient
@@ -158,14 +150,12 @@ contract OVFL is AccessControl, ReentrancyGuard {
 
     // Events
     event FeeTaken(address indexed payer, address indexed token, uint256 amount);
-    event Settled(address indexed market, uint256 redeemedWeth);
-    event Claimed(address indexed user, uint256 burned, uint256 wethOut);
+    event Claimed(address indexed user, address indexed market, address indexed ptToken, uint256 burnedAmount, uint256 ptOut);
     event MarketQueued(address indexed market, uint32 twapSeconds, uint256 eta);
     event MarketApproved(address indexed market, bool approved, uint32 twapSeconds, uint256 expiry);
     event FeeUpdated(uint16 feeBps, address treasury);
     event TimelockDelayQueued(uint256 newDelay, uint256 eta);
     event TimelockDelayExecuted(uint256 newDelay);
-    event DustToleranceUpdated(uint256 oldDust, uint256 newDust);
 
     constructor(address admin, address treasury) {
 
@@ -274,10 +264,12 @@ contract OVFL is AccessControl, ReentrancyGuard {
         SeriesInfo storage info = series[market];
         require(!info.approved, "OVFL: already added");
 
+        ( , address pt, ) = IPendleMarket(market).readTokens();
         uint256 expiry = IPendleMarket(market).expiry(); // cache (no SY→WETH recheck)
         info.approved = true;
         info.twapDurationFixed = pend.twapDuration;
         info.expiryCached = expiry;
+        ptToMarket[pt] = market;
 
         _approvedMarkets.push(market);
         delete pendingMarkets[market];
@@ -298,22 +290,12 @@ contract OVFL is AccessControl, ReentrancyGuard {
         }
     }
 
-    // --- Wrap 1:1 ---
-    function wrap(uint256 amount, address to) external nonReentrant {
-        require(to != address(0), "OVFL: to is zero address");
-        require(amount > 0, "OVFL: amount is zero");
-        WSTETH.safeTransferFrom(msg.sender, address(this), amount);
-        settledAsset += amount; // back new ovflETH 1:1
-        ovflETH.mint(to, amount);
-    }
-
      function deposit(address market, uint256 ptAmount)
         external
         nonReentrant
         returns (uint256 toUser, uint256 toStream, uint256 streamId)
     {
-        SeriesInfo storage info = series[market];
-        SeriesInfo memory memInfo = info;
+        SeriesInfo memory memInfo = series[market];
         // Check market is approved
         require(memInfo.approved, "OVFL: market not approved");
         require(ptAmount >= MIN_PT_AMOUNT, "OVFL: amount is less than 1 PT");
@@ -322,7 +304,6 @@ contract OVFL is AccessControl, ReentrancyGuard {
         // Pull PTs and update holdings
         ( , address pt, ) = IPendleMarket(market).readTokens();
         IERC20(pt).safeTransferFrom(msg.sender, address(this), ptAmount);
-        info.ptBalance += ptAmount; // update PT balance using storage pointer
 
         uint256 rateE18 = pendleOracle.getPtToSyRate(market, memInfo.twapDurationFixed);
 
@@ -366,59 +347,27 @@ contract OVFL is AccessControl, ReentrancyGuard {
         streamId = sablierLL.createWithDurations(p);
     }
 
-    function settleMarket(address market) external nonReentrant {
-        SeriesInfo storage info = series[market];
-        SeriesInfo memory memInfo = info;
-        require(memInfo.approved, "OVFL: market not approved");
-        require(!memInfo.settled, "OVFL: already settled");
-        require(memInfo.ptBalance > 0, "OVFL: no PT");
-        require(block.timestamp >= memInfo.expiryCached, "OVFL: not matured");
+    function claim(address ptToken, uint256 amount) external nonReentrant {
+        address market = ptToMarket[ptToken];
+        require(market != address(0), "OVFL: unknown PT");
 
-        uint256 ptAmount = memInfo.ptBalance;
-        
-        // Get PT, SY, and YT contracts from market
-        (address sy, address pt, address yt) = IPendleMarket(market).readTokens();
-        
-        // Verify YT is actually expired
-        require(IPYieldToken(yt).isExpired(), "OVFL: YT not expired");
+        SeriesInfo memory info = series[market];
+        require(info.approved, "OVFL: market not approved");
+        require(block.timestamp >= info.expiryCached, "OVFL: not matured");
+        require(amount > 0, "OVFL: amount is zero");
 
-        // Post-maturity redemption: PT -> YT contract -> SY -> wstETH
-        
-        // Step 1: Transfer PT to YT contract and redeem to SY
-        uint256 syBalanceBefore = IERC20(sy).balanceOf(address(this));
-        IERC20(pt).safeTransfer(address(yt), ptAmount);
-        uint256 syReceived = IPYieldToken(yt).redeemPY(address(this));
-        
-        // Verify we received the expected SY
-        uint256 syBalanceAfter = IERC20(sy).balanceOf(address(this));
-        require(syBalanceAfter >= syBalanceBefore + syReceived, "OVFL: SY redemption shortfall");
-        
-        // Step 2: Redeem SY to wstETH
-        uint256 wstethBefore = IERC20(WSTETH).balanceOf(address(this));
-        _ensureAllowance(IERC20(sy), sy, syReceived);
-        IStandardizedYield(sy).redeem(address(this), syReceived, address(WSTETH), 0, false);
-        uint256 wstethAfter = IERC20(WSTETH).balanceOf(address(this));
-        uint256 redeemed = wstethAfter - wstethBefore;        
+        uint256 vaultBalance = IERC20(ptToken).balanceOf(address(this));
+        require(amount <= vaultBalance, "OVFL: insufficient PT reserves");
 
-        info.settled = true;
-        info.ptBalance = 0;
-        settledAsset += redeemed;
-
-        emit Settled(market, redeemed);
-    }
-
-    function claim(uint256 amount) external nonReentrant {
-        uint256 claimableNow = settledAsset - totalClaimed;
-        require(amount > 0 && amount <= claimableNow, "OVFL: insufficient settled");
         ovflETH.burn(msg.sender, amount);
-        totalClaimed += amount;
-        IERC20(WSTETH).safeTransfer(msg.sender, amount);
-        emit Claimed(msg.sender, amount, amount);
+        IERC20(ptToken).safeTransfer(msg.sender, amount);
+
+        emit Claimed(msg.sender, market, ptToken, amount, amount);
     }
 
     // --- View ---
-    function claimable() external view returns (uint256) {
-        return settledAsset - totalClaimed;
+    function claimablePt(address ptToken) external view returns (uint256) {
+        return IERC20(ptToken).balanceOf(address(this));
     }
 
     /// @notice Check if a market supports the specified TWAP duration
