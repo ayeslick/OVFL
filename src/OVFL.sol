@@ -83,7 +83,7 @@ contract OVFL is AccessControl, ReentrancyGuard {
     // Timelock (self-timelocked delay; 0 => instant first-time changes)
     uint256 public timelockDelaySeconds; // 0 until first execute
 
-    uint256 public constant FEE_MAX_BPS = 1_000; // 10% max
+    uint256 public constant FEE_MAX_BPS = 100; // 1% max
     uint256 public constant MIN_DELAY_SECONDS = 1 hours;
     uint256 public constant MAX_DELAY_SECONDS = 2 days;
     uint256 public constant MIN_TWAP_DURATION = 15 minutes;
@@ -375,9 +375,6 @@ contract OVFL is AccessControl, ReentrancyGuard {
         IERC20(info.ptToken).safeTransferFrom(msg.sender, address(this), ptAmount);
 
         uint256 rateE18 = pendleOracle.getPtToSyRate(market, info.twapDurationFixed);
-
-        require(rateE18 <= 1e18, "OVFL: PT rate > par");
-        require(rateE18 >= 0.5e18, "OVFL: PT rate too low");
 
         toUser = PRBMath.mulDiv(ptAmount, rateE18, 1e18);
         if (toUser > ptAmount) toUser = ptAmount;
