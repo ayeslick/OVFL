@@ -18,62 +18,10 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/security/ReentrancyGuard.
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {PRBMath} from "prb-math/PRBMath.sol";
 import {OVFLETH} from "./OVFLETH.sol";
-
-// -------- Pendle minimal --------
-interface IPendleMarket {
-    function expiry() external view returns (uint256);
-    function increaseObservationsCardinalityNext(uint16 cardinalityNext) external;
-
-    function readTokens()
-        external
-        view
-        returns (address _SY, address _PT, address _YT);
-}
-
-interface IPendleOracle {
-    function getPtToSyRate(address market, uint32 twapDuration) external view returns (uint256);
-    function getOracleState(address market, uint32 duration) external view returns (bool, uint16, bool);
-}
-
-interface IStandardizedYield {
-    function getTokensOut() external view returns (address[] memory);
-
-    function yieldToken() external view returns (address);
-
-    function redeem(
-        address receiver,
-        uint256 shares,
-        address tokenOut,
-        uint256 minTokenOut,
-        bool burnFromInternalBalance
-    ) external returns (uint256);
-}
-
-// -------- Sablier V2 Lockup Linear (minimal) --------
-interface ISablierV2LockupLinear {
-    struct Durations {
-        uint40 cliff;
-        uint40 total;
-    }
-
-    struct Broker {
-        address account;
-        uint256 fee; // UD60x18 formatted
-    }
-
-    struct CreateWithDurations {
-        address sender;
-        address recipient;
-        uint128 totalAmount;
-        IERC20 asset;
-        bool cancelable;
-        bool transferable;
-        Durations durations;
-        Broker broker;
-    }
-
-    function createWithDurations(CreateWithDurations calldata params) external returns (uint256 streamId);
-}
+import {IPendleMarket} from "../interfaces/IPendleMarket.sol";
+import {IPendleOracle} from "../interfaces/IPendleOracle.sol";
+import {IStandardizedYield} from "../interfaces/IStandardizedYield.sol";
+import {ISablierV2LockupLinear} from "../interfaces/ISablierV2LockupLinear.sol";
 
 contract OVFL is AccessControl, ReentrancyGuard {
     using SafeERC20 for IERC20;
@@ -83,11 +31,6 @@ contract OVFL is AccessControl, ReentrancyGuard {
     // Timelock (self-timelocked delay; 0 => instant first-time changes)
     uint256 public timelockDelaySeconds; // 0 until first execute
 
-    uint256 public constant FEE_MAX_BPS = 100; // 1% max
-    uint256 public constant MIN_DELAY_SECONDS = 1 hours;
-    uint256 public constant MAX_DELAY_SECONDS = 2 days;
-    uint256 public constant MIN_TWAP_DURATION = 15 minutes;
-    uint256 public constant MAX_TWAP_DURATION = 30 minutes;
     uint256 public constant BASIS_POINTS = 10_000;
 
     uint256 public constant MIN_PT_AMOUNT = 0.1 ether; // 0.1 PT
@@ -131,6 +74,10 @@ contract OVFL is AccessControl, ReentrancyGuard {
 
     address private immutable TREASURY_ADDR;
 
+    address public adminContract;
+    mapping(address => uint256) public marketDepositLimits;
+    mapping(address => uint256) public marketTotalDeposited;
+
     IPendleOracle public immutable pendleOracle = IPendleOracle(0x9a9Fa8338dd5E5B2188006f1Cd2Ef26d921650C2);
     ISablierV2LockupLinear public immutable sablierLL = ISablierV2LockupLinear(0x3962f6585946823440d274aD7C719B02b49DE51E);
 
@@ -158,6 +105,14 @@ contract OVFL is AccessControl, ReentrancyGuard {
     event FeeUpdated(address indexed underlying, uint16 feeBps);
     event TimelockDelayQueued(uint256 newDelay, uint256 eta);
     event TimelockDelayExecuted(uint256 newDelay);
+    event MarketDepositLimitSet(address indexed market, uint256 limit);
+    event AdminContractUpdated(address indexed adminContract);
+
+    modifier onlyAdmin() {
+        require(adminContract != address(0), "OVFL: admin not set");
+        require(msg.sender == adminContract, "OVFL: not admin");
+        _;
+    }
 
     constructor(address admin, address treasury) {
         require(admin != address(0), "OVFL: admin is zero address");
@@ -167,167 +122,67 @@ contract OVFL is AccessControl, ReentrancyGuard {
         TREASURY_ADDR = treasury;
     }
 
-    // --- Admin: Underlying approvals & fees ---
-    function approveUnderlying(
-        address underlying,
-        string calldata name,
-        string calldata symbol,
-        uint16 feeBps,
-        address[] calldata aliases
-    ) external onlyRole(ADMIN_ROLE) {
-        require(underlying != address(0), "OVFL: underlying is zero");
-        require(feeBps <= FEE_MAX_BPS, "OVFL: fee >10%");
-
-        address ovflToken = underlyingToOvfl[underlying];
-        if (ovflToken == address(0)) {
-            OVFLETH token = new OVFLETH(name, symbol);
-            token.transferOwnership(address(this));
-            ovflToken = address(token);
-            underlyingToOvfl[underlying] = ovflToken;
-        }
-
-        approvedUnderlying[underlying] = true;
-        feeBpsByUnderlying[underlying] = feeBps;
-        _setUnderlyingAlias(underlying, underlying);
-
-        for (uint256 i; i < aliases.length; ++i) {
-            require(aliases[i] != address(0), "OVFL: alias is zero");
-            _setUnderlyingAlias(aliases[i], underlying);
-        }
-
-        emit UnderlyingApproved(underlying, ovflToken, feeBps);
+    function setAdminContract(address newAdminContract) external onlyRole(ADMIN_ROLE) {
+        require(newAdminContract != address(0), "OVFL: admin contract is zero address");
+        adminContract = newAdminContract;
+        emit AdminContractUpdated(newAdminContract);
     }
 
-    function setUnderlyingAlias(address token, address underlying) external onlyRole(ADMIN_ROLE) {
-        require(token != address(0), "OVFL: alias token is zero");
-        require(approvedUnderlying[underlying], "OVFL: underlying not approved");
-        _setUnderlyingAlias(token, underlying);
+    function setApprovedUnderlying(
+        address underlying,
+        address ovflToken,
+        uint16 feeBps,
+        bool approved
+    ) external onlyAdmin {
+        approvedUnderlying[underlying] = approved;
+        underlyingToOvfl[underlying] = approved ? ovflToken : address(0);
+        feeBpsByUnderlying[underlying] = feeBps;
+        if (approved) {
+            emit UnderlyingApproved(underlying, ovflToken, feeBps);
+        }
+    }
+
+    function setUnderlyingAlias(address token, address underlying) external onlyAdmin {
+        tokenToUnderlying[token] = underlying;
         emit UnderlyingAliasSet(token, underlying);
     }
 
-    function setUnderlyingFee(address underlying, uint16 feeBps) external onlyRole(ADMIN_ROLE) {
-        require(approvedUnderlying[underlying], "OVFL: underlying not approved");
-        require(feeBps <= FEE_MAX_BPS, "OVFL: fee >10%");
+    function setUnderlyingAliasInternal(address token, address underlying) external onlyAdmin {
+        tokenToUnderlying[token] = underlying;
+    }
+
+    function setUnderlyingFee(address underlying, uint16 feeBps) external onlyAdmin {
         feeBpsByUnderlying[underlying] = feeBps;
         emit FeeUpdated(underlying, feeBps);
     }
 
-    // --- Timelock delay (self-timelocked) ---
-    /// If current delay is 0, the queued change is instantaneous (eta = now).
-    function queueSetTimelockDelay(uint256 newDelay) external onlyRole(ADMIN_ROLE) {
-        require(newDelay >= MIN_DELAY_SECONDS && newDelay <= MAX_DELAY_SECONDS, "OVFL: delay bounds");
-        require(!pendingDelay.queued, "OVFL: delay queued");
-        uint256 wait = timelockDelaySeconds;
-        pendingDelay = PendingTimelockDelay({queued: true, newDelay: newDelay, eta: block.timestamp + wait});
-        emit TimelockDelayQueued(newDelay, pendingDelay.eta);
+    function setTimelockDelayQueued(uint256 newDelay, uint256 eta) external onlyAdmin {
+        pendingDelay = PendingTimelockDelay({queued: true, newDelay: newDelay, eta: eta});
+        emit TimelockDelayQueued(newDelay, eta);
     }
 
-    function executeSetTimelockDelay() external onlyRole(ADMIN_ROLE) {
-        require(pendingDelay.queued, "OVFL: no delay queued");
-        require(block.timestamp >= pendingDelay.eta, "OVFL: timelock not passed");
-        timelockDelaySeconds = pendingDelay.newDelay;
+    function setTimelockDelayExecuted(uint256 newDelay) external onlyAdmin {
+        timelockDelaySeconds = newDelay;
         delete pendingDelay;
-        emit TimelockDelayExecuted(timelockDelaySeconds);
+        emit TimelockDelayExecuted(newDelay);
     }
 
-    // --- Timelocked market onboarding ---
-    function queueAddMarket(address market, uint32 twapSeconds) external onlyRole(ADMIN_ROLE) {
-        require(market != address(0), "OVFL: market is zero address");
-        require(twapSeconds >= MIN_TWAP_DURATION && twapSeconds <= MAX_TWAP_DURATION, "OVFL: twap bounds");
-
-        PendingMarket storage pend = pendingMarkets[market];
-        require(!pend.queued, "OVFL: already queued");
-
-        // Auto-enable timelock after first market (if not already set)
-        bool isFirstMarket = (_approvedMarkets.length == 0 && timelockDelaySeconds == 0);
-
-        if (isFirstMarket) {
-            timelockDelaySeconds = MIN_DELAY_SECONDS; // Auto-set to minimum delay
-            emit TimelockDelayExecuted(MIN_DELAY_SECONDS);
-        }
-
-        (address sy, , ) = IPendleMarket(market).readTokens();
-        require(sy != address(0), "OVFL: unsupported underlying");
-
-        address underlying = tokenToUnderlying[sy];
-
-        if (underlying == address(0)) {
-            try IStandardizedYield(sy).yieldToken() returns (address yieldTokenAddr) {
-                if (yieldTokenAddr != address(0)) {
-                    address mapped = tokenToUnderlying[yieldTokenAddr];
-                    if (mapped != address(0)) {
-                        underlying = mapped;
-                    } else if (approvedUnderlying[yieldTokenAddr]) {
-                        underlying = yieldTokenAddr;
-                    }
-                }
-            } catch {}
-        }
-
-        if (underlying == address(0)) {
-            try IStandardizedYield(sy).getTokensOut() returns (address[] memory outs) {
-                for (uint256 i; i < outs.length; ++i) {
-                    address candidate = outs[i];
-                    if (candidate == address(0)) continue;
-                    address mapped = tokenToUnderlying[candidate];
-                    if (mapped != address(0)) {
-                        underlying = mapped;
-                        break;
-                    }
-                    if (approvedUnderlying[candidate]) {
-                        underlying = candidate;
-                        break;
-                    }
-                }
-            } catch {}
-        }
-
-        require(underlying != address(0), "OVFL: unsupported underlying");
-        require(approvedUnderlying[underlying], "OVFL: underlying not approved");
-
-        _setUnderlyingAlias(sy, underlying);
-
-        // Check TWAP compatibility with market oracle
-        (bool increaseCardinalityRequired, uint16 cardinalityRequired, ) = pendleOracle.getOracleState(market, twapSeconds);
-
-        if (increaseCardinalityRequired) {
-            try IPendleMarket(market).increaseObservationsCardinalityNext(cardinalityRequired) {} catch {
-                revert("OVFL: cannot increase oracle cardinality");
-            }
-        }
-
-        // First market gets instant execution, subsequent markets use timelock delay
-        uint256 wait = isFirstMarket ? 0 : timelockDelaySeconds;
-        pend.queued = true;
-        pend.twapDuration = twapSeconds;
-        pend.eta = block.timestamp + wait;
-        pend.underlying = underlying;
-
-        emit MarketQueued(market, twapSeconds, pend.eta);
+    function setMarketQueued(address market, uint32 twapDuration, uint256 eta, address underlying) external onlyAdmin {
+        pendingMarkets[market] = PendingMarket({queued: true, twapDuration: twapDuration, eta: eta, underlying: underlying});
+        emit MarketQueued(market, twapDuration, eta);
     }
 
-    function executeAddMarket(address market) external onlyRole(ADMIN_ROLE) {
-        PendingMarket storage pend = pendingMarkets[market];
-        require(pend.queued, "OVFL: not queued");
-        require(block.timestamp >= pend.eta, "OVFL: timelock not passed");
-
-        _checkOracleReady(market, pend.twapDuration);
-
+    function setMarketApproved(
+        address market,
+        address pt,
+        address underlying,
+        address ovflToken,
+        uint32 twapDuration,
+        uint256 expiry
+    ) external onlyAdmin {
         SeriesInfo storage info = series[market];
-        require(!info.approved, "OVFL: already added");
-
-        (address sy, address pt, ) = IPendleMarket(market).readTokens();
-        require(sy != address(0), "OVFL: unsupported underlying");
-
-        address underlying = pend.underlying;
-        require(underlying != address(0), "OVFL: underlying not approved");
-
-        address ovflToken = underlyingToOvfl[underlying];
-        require(ovflToken != address(0), "OVFL: ovfl token missing");
-
-        uint256 expiry = IPendleMarket(market).expiry();
         info.approved = true;
-        info.twapDurationFixed = pend.twapDuration;
+        info.twapDurationFixed = twapDuration;
         info.expiryCached = expiry;
         info.ptToken = pt;
         info.ovflToken = ovflToken;
@@ -338,23 +193,16 @@ contract OVFL is AccessControl, ReentrancyGuard {
         _approvedMarkets.push(market);
         delete pendingMarkets[market];
 
-        emit MarketApproved(market, pt, underlying, ovflToken, info.twapDurationFixed, expiry);
+        emit MarketApproved(market, pt, underlying, ovflToken, twapDuration, expiry);
     }
+
+    function setMarketDepositLimit(address market, uint256 limit) external onlyAdmin {
+        marketDepositLimits[market] = limit;
+        emit MarketDepositLimitSet(market, limit);
+    }
+
 
     // --- Internal helpers ---
-    function _setUnderlyingAlias(address token, address underlying) internal {
-        address current = tokenToUnderlying[token];
-        require(current == address(0) || current == underlying, "OVFL: alias conflict");
-        tokenToUnderlying[token] = underlying;
-    }
-
-    function _checkOracleReady(address market, uint32 duration) internal view {
-        (bool increaseCardinalityRequired, , bool oldestObservationSatisfied) =
-            pendleOracle.getOracleState(market, duration);
-        require(!increaseCardinalityRequired, "OVFL: oracle cardinality");
-        require(oldestObservationSatisfied, "OVFL: oracle wait");
-    }
-
     function _ensureAllowance(IERC20 token, address spender, uint256 needed) internal {
         if (token.allowance(address(this), spender) < needed) {
             token.approve(spender, type(uint256).max);
@@ -371,6 +219,12 @@ contract OVFL is AccessControl, ReentrancyGuard {
         require(info.approved, "OVFL: market not approved");
         require(ptAmount >= MIN_PT_AMOUNT, "OVFL: amount < min PT");
         require(block.timestamp < info.expiryCached, "OVFL: matured");
+
+        uint256 currentDeposited = marketTotalDeposited[market];
+        uint256 limit = marketDepositLimits[market];
+        if (limit > 0) {
+            require(currentDeposited + ptAmount <= limit, "OVFL: deposit limit exceeded");
+        }
 
         IERC20(info.ptToken).safeTransferFrom(msg.sender, address(this), ptAmount);
 
@@ -407,6 +261,8 @@ contract OVFL is AccessControl, ReentrancyGuard {
             broker: ISablierV2LockupLinear.Broker({account: address(0), fee: 0})
         });
         streamId = sablierLL.createWithDurations(p);
+
+        marketTotalDeposited[market] = currentDeposited + ptAmount;
     }
 
     function claim(address ptToken, uint256 amount) external nonReentrant {
@@ -420,6 +276,10 @@ contract OVFL is AccessControl, ReentrancyGuard {
 
         uint256 vaultBalance = IERC20(ptToken).balanceOf(address(this));
         require(amount <= vaultBalance, "OVFL: insufficient PT reserves");
+
+        uint256 currentDeposited = marketTotalDeposited[market];
+        require(currentDeposited >= amount, "OVFL: deposit accounting");
+        marketTotalDeposited[market] = currentDeposited - amount;
 
         OVFLETH(info.ovflToken).burn(msg.sender, amount);
         IERC20(ptToken).safeTransfer(msg.sender, amount);
