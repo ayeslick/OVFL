@@ -19,6 +19,7 @@ contract Admin is AccessControl {
     uint256 public constant MAX_TWAP_DURATION = 30 minutes;
 
     OVFL public ovfl;
+    PendingOVFL public pendingOVFL;
     IPendleOracle public constant pendleOracle = IPendleOracle(0x9a9Fa8338dd5E5B2188006f1Cd2Ef26d921650C2);
 
     // Timelock state (moved from OVFL)
@@ -49,7 +50,14 @@ contract Admin is AccessControl {
         uint256 eta;
     }
 
+    struct PendingOVFL {
+        bool queued;
+        address newOVFL;
+        uint256 eta;
+    }
+
     // Events (moved from OVFL)
+    event OVFLQueued(address indexed ovflAddress, uint256 eta);
     event OVFLAddressSet(address indexed ovflAddress);
     event MarketQueued(address indexed market, uint32 twapSeconds, uint256 eta);
     event MarketApproved(
@@ -72,10 +80,29 @@ contract Admin is AccessControl {
         _grantRole(ADMIN_ROLE, admin);
     }
 
-    function setOVFL(address ovflAddress) external onlyRole(ADMIN_ROLE) {
+    function queueSetOVFL(address ovflAddress) external onlyRole(ADMIN_ROLE) {
         require(ovflAddress != address(0), "Admin: ovfl is zero address");
-        ovfl = OVFL(ovflAddress);
-        emit OVFLAddressSet(ovflAddress);
+        require(!pendingOVFL.queued, "Admin: ovfl already queued");
+
+        // First time setup is instant
+        if (address(ovfl) == address(0)) {
+            ovfl = OVFL(ovflAddress);
+            emit OVFLAddressSet(ovflAddress);
+            return;
+        }
+
+        uint256 eta = block.timestamp + timelockDelaySeconds;
+        pendingOVFL = PendingOVFL({queued: true, newOVFL: ovflAddress, eta: eta});
+        emit OVFLQueued(ovflAddress, eta);
+    }
+
+    function executeSetOVFL() external onlyRole(ADMIN_ROLE) {
+        require(pendingOVFL.queued, "Admin: no ovfl queued");
+        require(block.timestamp >= pendingOVFL.eta, "Admin: timelock not passed");
+
+        ovfl = OVFL(pendingOVFL.newOVFL);
+        emit OVFLAddressSet(pendingOVFL.newOVFL);
+        delete pendingOVFL;
     }
 
     function approveUnderlying(

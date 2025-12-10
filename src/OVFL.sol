@@ -49,6 +49,14 @@ contract OVFL is ReentrancyGuard {
     ISablierV2LockupLinear public immutable sablierLL = ISablierV2LockupLinear(0x3962f6585946823440d274aD7C719B02b49DE51E);
 
     // Events - only what's needed for core operations
+    event Deposited(
+        address indexed user,
+        address indexed market,
+        uint256 ptAmount,
+        uint256 toUser,
+        uint256 toStream,
+        uint256 streamId
+    );
     event FeeTaken(address indexed payer, address indexed token, uint256 amount);
     event Claimed(
         address indexed user,
@@ -117,7 +125,7 @@ contract OVFL is ReentrancyGuard {
     }
 
     // --- Deposit flow ---
-    function deposit(address market, uint256 ptAmount)
+    function deposit(address market, uint256 ptAmount, uint256 minToUser)
         external
         nonReentrant
         returns (uint256 toUser, uint256 toStream, uint256 streamId)
@@ -142,6 +150,7 @@ contract OVFL is ReentrancyGuard {
         toStream = ptAmount - toUser;
 
         require(toStream > 0, "OVFL: nothing to stream");
+        require(toUser >= minToUser, "OVFL: slippage");
 
         uint256 feeAmount = info.feeBps == 0 ? 0 : PRBMath.mulDiv(toUser, info.feeBps, BASIS_POINTS);
 
@@ -169,6 +178,8 @@ contract OVFL is ReentrancyGuard {
         streamId = sablierLL.createWithDurations(p);
 
         marketTotalDeposited[market] = currentDeposited + ptAmount;
+
+        emit Deposited(msg.sender, market, ptAmount, toUser, toStream, streamId);
     }
 
     function claim(address ptToken, uint256 amount) external nonReentrant {

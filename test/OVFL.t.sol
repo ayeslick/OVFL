@@ -29,9 +29,9 @@ contract OVFLTest is Test {
         // Deploy OVFL with Admin as the admin contract
         ovfl = new OVFL(address(admin), TREASURY);
 
-        // Connect Admin to OVFL
+        // Connect Admin to OVFL (first time is instant)
         vm.startPrank(ADMIN_ADDR);
-        admin.setOVFL(address(ovfl));
+        admin.queueSetOVFL(address(ovfl));
 
         // Approve underlying (WSTETH)
         address[] memory aliases = new address[](0);
@@ -67,8 +67,8 @@ contract OVFLTest is Test {
         // Preview the deposit to get expected values
         (uint256 expectedToUser, uint256 expectedToStream, ) = ovfl.previewStream(PENDLE_MARKET, ptAmount);
         
-        // Execute deposit
-        (uint256 actualToUser, uint256 actualToStream, uint256 streamId) = ovfl.deposit(PENDLE_MARKET, ptAmount);
+        // Execute deposit with slippage protection (minToUser = 0 for no slippage check in test)
+        (uint256 actualToUser, uint256 actualToStream, uint256 streamId) = ovfl.deposit(PENDLE_MARKET, ptAmount, 0);
         
         vm.stopPrank();
         
