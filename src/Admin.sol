@@ -19,8 +19,53 @@ contract Admin is AccessControl {
     uint256 public constant MAX_TWAP_DURATION = 30 minutes;
 
     OVFL public ovfl;
-    event OVFLAddressSet(address indexed ovflAddress);
     IPendleOracle public constant pendleOracle = IPendleOracle(0x9a9Fa8338dd5E5B2188006f1Cd2Ef26d921650C2);
+
+    // Timelock state (moved from OVFL)
+    uint256 public timelockDelaySeconds;
+    PendingTimelockDelay public pendingDelay;
+
+    // Market queue (moved from OVFL)
+    mapping(address => PendingMarket) public pendingMarkets;
+    address[] private _approvedMarkets;
+
+    // Underlying management (moved from OVFL)
+    mapping(address => bool) public approvedUnderlying;
+    mapping(address => address) public underlyingToOvfl;
+    mapping(address => address) public tokenToUnderlying;
+    mapping(address => uint16) public feeBpsByUnderlying;
+
+    // Structs (moved from OVFL)
+    struct PendingMarket {
+        bool queued;
+        uint32 twapDuration;
+        uint256 eta;
+        address underlying;
+    }
+
+    struct PendingTimelockDelay {
+        bool queued;
+        uint256 newDelay;
+        uint256 eta;
+    }
+
+    // Events (moved from OVFL)
+    event OVFLAddressSet(address indexed ovflAddress);
+    event MarketQueued(address indexed market, uint32 twapSeconds, uint256 eta);
+    event MarketApproved(
+        address indexed market,
+        address indexed ptToken,
+        address indexed underlying,
+        address ovflToken,
+        uint32 twapSeconds,
+        uint256 expiry
+    );
+    event UnderlyingApproved(address indexed underlying, address indexed ovflToken, uint16 feeBps);
+    event UnderlyingAliasSet(address indexed token, address indexed underlying);
+    event FeeUpdated(address indexed underlying, uint16 feeBps);
+    event TimelockDelayQueued(uint256 newDelay, uint256 eta);
+    event TimelockDelayExecuted(uint256 newDelay);
+    event MarketDepositLimitSet(address indexed market, uint256 limit);
 
     constructor(address admin) {
         require(admin != address(0), "Admin: admin is zero address");
@@ -43,7 +88,7 @@ contract Admin is AccessControl {
         require(underlying != address(0), "Admin: underlying is zero");
         require(feeBps <= FEE_MAX_BPS, "Admin: fee >10%");
 
-        address ovflToken = ovfl.underlyingToOvfl(underlying);
+        address ovflToken = underlyingToOvfl[underlying];
         if (ovflToken == address(0)) {
             OVFLETH token = new OVFLETH(name, symbol);
             token.transferOwnership(address(ovfl));
@@ -58,69 +103,75 @@ contract Admin is AccessControl {
             _setAliasInternal(aliasToken, underlying);
         }
 
-        ovfl.setApprovedUnderlying(underlying, ovflToken, feeBps, true);
+        approvedUnderlying[underlying] = true;
+        underlyingToOvfl[underlying] = ovflToken;
+        feeBpsByUnderlying[underlying] = feeBps;
+        emit UnderlyingApproved(underlying, ovflToken, feeBps);
     }
 
     function setUnderlyingAlias(address token, address underlying) external onlyRole(ADMIN_ROLE) {
         require(token != address(0), "Admin: alias token is zero");
-        require(ovfl.approvedUnderlying(underlying), "Admin: underlying not approved");
+        require(approvedUnderlying[underlying], "Admin: underlying not approved");
 
-        address current = ovfl.canonicalUnderlyingForToken(token);
+        address current = tokenToUnderlying[token];
         require(current == address(0) || current == underlying, "Admin: alias conflict");
 
-        ovfl.setUnderlyingAlias(token, underlying);
+        tokenToUnderlying[token] = underlying;
+        emit UnderlyingAliasSet(token, underlying);
     }
 
     function setUnderlyingFee(address underlying, uint16 feeBps) external onlyRole(ADMIN_ROLE) {
-        require(ovfl.approvedUnderlying(underlying), "Admin: underlying not approved");
+        require(approvedUnderlying[underlying], "Admin: underlying not approved");
         require(feeBps <= FEE_MAX_BPS, "Admin: fee >10%");
 
-        ovfl.setUnderlyingFee(underlying, feeBps);
+        feeBpsByUnderlying[underlying] = feeBps;
+        emit FeeUpdated(underlying, feeBps);
     }
 
     function queueSetTimelockDelay(uint256 newDelay) external onlyRole(ADMIN_ROLE) {
         require(newDelay >= MIN_DELAY_SECONDS && newDelay <= MAX_DELAY_SECONDS, "Admin: delay bounds");
-        (bool queued,,) = ovfl.pendingDelay();
-        require(!queued, "Admin: delay queued");
+        require(!pendingDelay.queued, "Admin: delay queued");
 
-        uint256 wait = ovfl.timelockDelaySeconds();
+        uint256 wait = timelockDelaySeconds;
         uint256 eta = block.timestamp + wait;
-        ovfl.setTimelockDelayQueued(newDelay, eta);
+        pendingDelay = PendingTimelockDelay({queued: true, newDelay: newDelay, eta: eta});
+        emit TimelockDelayQueued(newDelay, eta);
     }
 
     function executeSetTimelockDelay() external onlyRole(ADMIN_ROLE) {
-        (bool queued, uint256 newDelay, uint256 eta) = ovfl.pendingDelay();
-        require(queued, "Admin: no delay queued");
-        require(block.timestamp >= eta, "Admin: timelock not passed");
+        require(pendingDelay.queued, "Admin: no delay queued");
+        require(block.timestamp >= pendingDelay.eta, "Admin: timelock not passed");
 
-        ovfl.setTimelockDelayExecuted(newDelay);
+        timelockDelaySeconds = pendingDelay.newDelay;
+        emit TimelockDelayExecuted(pendingDelay.newDelay);
+        delete pendingDelay;
     }
 
     function queueAddMarket(address market, uint32 twapSeconds) external onlyRole(ADMIN_ROLE) {
         require(market != address(0), "Admin: market is zero address");
         require(twapSeconds >= MIN_TWAP_DURATION && twapSeconds <= MAX_TWAP_DURATION, "Admin: twap bounds");
 
-        (bool queued,,,) = ovfl.pendingMarkets(market);
-        require(!queued, "Admin: already queued");
+        require(!pendingMarkets[market].queued, "Admin: already queued");
 
-        bool isFirstMarket = (ovfl.approvedMarketsCount() == 0 && ovfl.timelockDelaySeconds() == 0);
+        bool isFirstMarket = (_approvedMarkets.length == 0 && timelockDelaySeconds == 0);
 
         if (isFirstMarket) {
-            ovfl.setTimelockDelayExecuted(MIN_DELAY_SECONDS);
+            timelockDelaySeconds = MIN_DELAY_SECONDS;
+            emit TimelockDelayExecuted(MIN_DELAY_SECONDS);
         }
 
         (address sy,,) = IPendleMarket(market).readTokens();
         require(sy != address(0), "Admin: unsupported underlying");
 
-        address underlying = ovfl.canonicalUnderlyingForToken(sy);
+        address underlying = tokenToUnderlying[sy];
 
         if (underlying == address(0)) {
             try IStandardizedYield(sy).yieldToken() returns (address yieldTokenAddr) {
                 if (yieldTokenAddr != address(0)) {
-                    address mapped = ovfl.canonicalUnderlyingForToken(yieldTokenAddr);
+                    address mapped = tokenToUnderlying[yieldTokenAddr];
                     if (mapped != address(0)) {
                         underlying = mapped;
-                    } else if (ovfl.approvedUnderlying(yieldTokenAddr)) {
+                    } else if (approvedUnderlying[yieldTokenAddr]) {
                         underlying = yieldTokenAddr;
                     }
                 }
@@ -132,12 +183,12 @@ contract Admin is AccessControl {
                 for (uint256 i; i < outs.length; ++i) {
                     address candidate = outs[i];
                     if (candidate == address(0)) continue;
-                    address mapped = ovfl.canonicalUnderlyingForToken(candidate);
+                    address mapped = tokenToUnderlying[candidate];
                     if (mapped != address(0)) {
                         underlying = mapped;
                         break;
                     }
-                    if (ovfl.approvedUnderlying(candidate)) {
+                    if (approvedUnderlying[candidate]) {
                         underlying = candidate;
                         break;
                     }
@@ -146,7 +197,7 @@ contract Admin is AccessControl {
         }
 
         require(underlying != address(0), "Admin: unsupported underlying");
-        require(ovfl.approvedUnderlying(underlying), "Admin: underlying not approved");
+        require(approvedUnderlying[underlying], "Admin: underlying not approved");
 
         _setAliasInternal(sy, underlying);
 
@@ -158,33 +209,40 @@ contract Admin is AccessControl {
             }
         }
 
-        uint256 wait = isFirstMarket ? 0 : ovfl.timelockDelaySeconds();
+        uint256 wait = isFirstMarket ? 0 : timelockDelaySeconds;
         uint256 eta = block.timestamp + wait;
 
-        ovfl.setMarketQueued(market, twapSeconds, eta, underlying);
+        pendingMarkets[market] = PendingMarket({queued: true, twapDuration: twapSeconds, eta: eta, underlying: underlying});
+        emit MarketQueued(market, twapSeconds, eta);
     }
 
     function executeAddMarket(address market) external onlyRole(ADMIN_ROLE) {
-        (bool queued, uint32 twapDuration, uint256 eta, address underlying) = ovfl.pendingMarkets(market);
-        require(queued, "Admin: not queued");
-        require(block.timestamp >= eta, "Admin: timelock not passed");
+        PendingMarket memory pending = pendingMarkets[market];
+        require(pending.queued, "Admin: not queued");
+        require(block.timestamp >= pending.eta, "Admin: timelock not passed");
 
-        _checkOracleReady(market, twapDuration);
+        _checkOracleReady(market, pending.twapDuration);
 
-        (bool approved,,,,,) = ovfl.series(market);
+        (bool approved,,,,,,) = ovfl.series(market);
         require(!approved, "Admin: already added");
 
         (address sy, address pt,) = IPendleMarket(market).readTokens();
         require(sy != address(0), "Admin: unsupported underlying");
 
-        require(underlying != address(0), "Admin: underlying not approved");
+        require(pending.underlying != address(0), "Admin: underlying not approved");
 
-        address ovflToken = ovfl.underlyingToOvfl(underlying);
+        address ovflToken = underlyingToOvfl[pending.underlying];
         require(ovflToken != address(0), "Admin: ovfl token missing");
 
         uint256 expiry = IPendleMarket(market).expiry();
+        uint16 feeBps = feeBpsByUnderlying[pending.underlying];
 
-        ovfl.setMarketApproved(market, pt, underlying, ovflToken, twapDuration, expiry);
+        ovfl.setSeriesApproved(market, pt, pending.underlying, ovflToken, pending.twapDuration, expiry, feeBps);
+
+        _approvedMarkets.push(market);
+        delete pendingMarkets[market];
+
+        emit MarketApproved(market, pt, pending.underlying, ovflToken, pending.twapDuration, expiry);
     }
 
     function setMarketDepositLimit(address market, uint256 limit) external onlyRole(ADMIN_ROLE) {
@@ -195,12 +253,34 @@ contract Admin is AccessControl {
         }
 
         ovfl.setMarketDepositLimit(market, limit);
+        emit MarketDepositLimitSet(market, limit);
+    }
+
+    function setMinPtAmount(uint256 newMin) external onlyRole(ADMIN_ROLE) {
+        ovfl.setMinPtAmount(newMin);
     }
 
     function _setAliasInternal(address token, address underlying) internal {
-        address current = ovfl.canonicalUnderlyingForToken(token);
+        address current = tokenToUnderlying[token];
         require(current == address(0) || current == underlying, "Admin: alias conflict");
-        ovfl.setUnderlyingAliasInternal(token, underlying);
+        tokenToUnderlying[token] = underlying;
+    }
+
+    // View functions
+    function getApprovedMarkets() external view returns (address[] memory) {
+        return _approvedMarkets;
+    }
+
+    function approvedMarketsCount() external view returns (uint256) {
+        return _approvedMarkets.length;
+    }
+
+    function ovflTokenForUnderlying(address underlying) external view returns (address) {
+        return underlyingToOvfl[underlying];
+    }
+
+    function canonicalUnderlyingForToken(address token) external view returns (address) {
+        return tokenToUnderlying[token];
     }
 
     function _checkOracleReady(address market, uint32 duration) internal view {
