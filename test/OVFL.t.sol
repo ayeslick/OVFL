@@ -29,18 +29,20 @@ contract OVFLTest is Test {
         // Deploy OVFL with Admin as the admin contract
         ovfl = new OVFL(address(admin), TREASURY);
 
-        // Connect Admin to OVFL (first time is instant)
+        // Connect Admin to OVFL
         vm.startPrank(ADMIN_ADDR);
-        admin.queueSetOVFL(address(ovfl));
+        admin.setOVFL(address(ovfl));
 
         // Approve underlying (WSTETH)
-        address[] memory aliases = new address[](0);
-        admin.approveUnderlying(WSTETH, "OVFL wstETH", "ovflWSTETH", 100, aliases); // 1% fee
+        admin.approveUnderlying(WSTETH, "OVFL wstETH", "ovflWSTETH");
 
-        // Queue and execute market
-        admin.queueAddMarket(PENDLE_MARKET, TWAP_DURATION);
+        // Queue market with explicit underlying and fee
+        admin.queueAddMarket(PENDLE_MARKET, TWAP_DURATION, WSTETH, 100); // 1% fee
 
-        // First market has no timelock, so execute immediately
+        // Skip timelock
+        vm.warp(block.timestamp + 1 hours);
+
+        // Execute market
         admin.executeAddMarket(PENDLE_MARKET);
 
         vm.stopPrank();
