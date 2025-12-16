@@ -40,7 +40,7 @@ contract OVFLTest is Test {
         admin.queueAddMarket(PENDLE_MARKET, TWAP_DURATION, WSTETH, 100); // 1% fee
 
         // Skip timelock
-        vm.warp(block.timestamp + 1 hours);
+        vm.warp(block.timestamp + 24 hours);
 
         // Execute market
         admin.executeAddMarket(PENDLE_MARKET);
