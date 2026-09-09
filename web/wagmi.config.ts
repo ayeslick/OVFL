@@ -18,7 +18,14 @@ export default defineConfig({
   plugins: [
     foundry({
       project: "..",
-      include: ["OVRFLOFactory.json", "OVRFLO.json", "OVRFLOLending.json", "OVRFLOReserve.json", "OVRFLORequestBook.json"],
+      include: [
+        "OVRFLOFactory.json",
+        "OVRFLO.json",
+        "OVRFLOLending.json",
+        "OVRFLOReserve.json",
+        "OVRFLORequestBook.json",
+        "OVRFLOLens.json",
+      ],
     }),
   ],
 });

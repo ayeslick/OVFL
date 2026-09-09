@@ -55,7 +55,7 @@ export type BorrowerPage = {
   sourceCount: bigint;
 };
 
-/** Plain market views. Deployless lenses live in streams.ts behind pin-probe. */
+/** Plain market views. Wallet-held streams use the deployed OVRFLOLens. */
 export type LendingReadClient = Pick<PublicClient, "readContract">;
 
 export type LendingReadOptions = {

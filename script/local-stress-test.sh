@@ -105,74 +105,31 @@ deposit_and_get_stream() {
   cast --to-dec "$stream_hex" 2>/dev/null || echo ""
 }
 
-# Borrow against a stream at a specific tick. Candidate IDs come from this
-# fixture's successful supply receipts, then every candidate is hydrated from
-# the lending contract before selection. This keeps the walkthrough on the
-# same projection -> direct hydration -> bounded route model as the app.
-# Automates:
-# 1. Approve lending contract on the Sablier NFT
-# 2. Hydrate projected fixture IDs and build a bounded route
-# 3. Call createBorrowerLoanPool with minAcceptable=0 (no slippage guard for testing)
+# Borrow against a stream at a specific tick.
+# Approve the NFT, then call previewBorrow + borrow. No lender-id reconstruction.
 borrow_against_stream() {
   local pk=$1 stream_id=$2 apr=$3 amount=$4 borrower=$5
   if [ -z "$stream_id" ] || [ "$stream_id" = "0" ]; then
     echo "    SKIP: no stream ID"
     return 1
   fi
-  # 1. Approve lending contract to transfer the stream NFT
   send "$pk" "$SABLIER" 'approve(address,uint256)' "$LENDING" "$stream_id" >/dev/null 2>&1
-  # 2. Directly hydrate the IDs this fixture projected while supplying.
-  local projected=${ROUTE_IDS_BY_APR[$apr]:-}
-  local max_route
-  max_route=$(call "$LENDING" 'MAX_ROUTE_IDS()(uint256)' | awk '{print $1}')
-  local positions_json='[]'
-  local id tuple lender position_market position_apr available
-  IFS=',' read -r -a projected_ids <<< "$projected"
-  for id in "${projected_ids[@]}"; do
-    [ -n "$id" ] || continue
-    tuple=$(call "$LENDING" 'liquidityPositions(uint256)(address,address,uint16,uint128)' "$id")
-    lender=$(echo "$tuple" | sed -n '1p' | awk '{print $1}')
-    position_market=$(echo "$tuple" | sed -n '2p' | awk '{print $1}')
-    position_apr=$(echo "$tuple" | sed -n '3p' | awk '{print $1}')
-    available=$(echo "$tuple" | sed -n '4p' | awk '{print $1}')
-    if [ "${position_market,,}" != "${PRIMARY_MARKET,,}" ] ||
-       [ "$position_apr" != "$apr" ] ||
-       [ "$available" = "0" ]; then
-      continue
-    fi
-    positions_json=$(jq -c \
-      --arg id "$id" \
-      --arg lender "$lender" \
-      --arg market "$position_market" \
-      --argjson aprBps "$position_apr" \
-      --arg availableLiquidity "$available" \
-      '. + [{id: $id, lender: $lender, market: $market, aprBps: $aprBps, availableLiquidity: $availableLiquidity}]' \
-      <<< "$positions_json")
-  done
-  local aggregate_depth route route_status ids
-  aggregate_depth=$(call "$LENDING" 'marketAprAvailableLiquidity(address,uint16)(uint256)' "$PRIMARY_MARKET" "$apr" | awk '{print $1}')
-  route=$(jq -n -c \
-    --argjson positions "$positions_json" \
-    --arg borrower "$borrower" \
-    --arg target "$amount" \
-    --arg aggregateDepth "$aggregate_depth" \
-    --argjson maxRouteIds "$max_route" \
-    '{positions: $positions, borrower: $borrower, target: $target, aggregateDepth: $aggregateDepth, maxRouteIds: $maxRouteIds}' |
-    node --no-warnings --experimental-strip-types "$REPO_ROOT/web/scripts/select-hydrated-route.mjs")
-  route_status=$(jq -r '.status' <<< "$route")
-  if [ "$route_status" != "ready" ]; then
-    echo "    SKIP: projected route at ${apr}bps is incomplete after direct hydration"
+  local preview actual min_out
+  preview=$(call "$LENDING" 'previewBorrow(address,uint16,uint128,uint256)(uint256,uint256,uint256)' \
+    "$PRIMARY_MARKET" "$apr" "$amount" "$stream_id")
+  actual=$(echo "$preview" | sed -n '1p' | awk '{print $1}')
+  if [ -z "$actual" ] || [ "$actual" = "0" ]; then
+    echo "    SKIP: previewBorrow returned zero at ${apr}bps"
     return 1
   fi
-  ids=$(jq -r '.selectedIds | join(",")' <<< "$route")
-  # 3. Submit the borrow
+  min_out=$actual
   send "$pk" "$LENDING" \
-    'createBorrowerLoanPool(uint256[],uint256,uint128,uint128)' \
-    "[$ids]" "$stream_id" "$amount" 0 >/dev/null 2>&1
+    'borrow(address,uint16,uint128,uint256,uint128,address)' \
+    "$PRIMARY_MARKET" "$apr" "$amount" "$stream_id" "$min_out" "$borrower" >/dev/null 2>&1
   if [ $? -eq 0 ]; then
     echo "    OK: borrowed $amount against stream #$stream_id at ${apr}bps"
   else
-    echo "    FAIL: createBorrowerLoanPool reverted (stream #$stream_id at ${apr}bps)"
+    echo "    FAIL: borrow reverted (stream #$stream_id at ${apr}bps)"
     return 1
   fi
 }

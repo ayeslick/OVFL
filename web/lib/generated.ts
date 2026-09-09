@@ -2088,6 +2088,107 @@ export const ovrfloLendingAbi = [
 ] as const
 
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+// OVRFLOLens
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+export const ovrfloLensAbi = [
+  {
+    type: 'constructor',
+    inputs: [{ name: 'lockup_', internalType: 'address', type: 'address' }],
+    stateMutability: 'nonpayable',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'lockup',
+    outputs: [
+      {
+        name: '',
+        internalType: 'contract ISablierV2LockupLinear',
+        type: 'address',
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [{ name: 'owner', internalType: 'address', type: 'address' }],
+    name: 'streamsOfOwner',
+    outputs: [
+      { name: 'total', internalType: 'uint256', type: 'uint256' },
+      {
+        name: 'streams',
+        internalType: 'struct OVRFLOLens.StreamView[]',
+        type: 'tuple[]',
+        components: [
+          { name: 'streamId', internalType: 'uint256', type: 'uint256' },
+          { name: 'owner', internalType: 'address', type: 'address' },
+          { name: 'sender', internalType: 'address', type: 'address' },
+          { name: 'asset', internalType: 'contract IERC20', type: 'address' },
+          { name: 'startTime', internalType: 'uint40', type: 'uint40' },
+          { name: 'cliffTime', internalType: 'uint40', type: 'uint40' },
+          { name: 'endTime', internalType: 'uint40', type: 'uint40' },
+          { name: 'deposited', internalType: 'uint128', type: 'uint128' },
+          { name: 'withdrawn', internalType: 'uint128', type: 'uint128' },
+          { name: 'refunded', internalType: 'uint128', type: 'uint128' },
+          {
+            name: 'withdrawableAmount',
+            internalType: 'uint128',
+            type: 'uint128',
+          },
+          { name: 'status', internalType: 'uint8', type: 'uint8' },
+          { name: 'isCancelable', internalType: 'bool', type: 'bool' },
+          { name: 'isDepleted', internalType: 'bool', type: 'bool' },
+          { name: 'wasCanceled', internalType: 'bool', type: 'bool' },
+        ],
+      },
+    ],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [
+      { name: 'owner', internalType: 'address', type: 'address' },
+      { name: 'start', internalType: 'uint256', type: 'uint256' },
+      { name: 'stop', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'streamsOfOwnerIn',
+    outputs: [
+      { name: 'total', internalType: 'uint256', type: 'uint256' },
+      {
+        name: 'streams',
+        internalType: 'struct OVRFLOLens.StreamView[]',
+        type: 'tuple[]',
+        components: [
+          { name: 'streamId', internalType: 'uint256', type: 'uint256' },
+          { name: 'owner', internalType: 'address', type: 'address' },
+          { name: 'sender', internalType: 'address', type: 'address' },
+          { name: 'asset', internalType: 'contract IERC20', type: 'address' },
+          { name: 'startTime', internalType: 'uint40', type: 'uint40' },
+          { name: 'cliffTime', internalType: 'uint40', type: 'uint40' },
+          { name: 'endTime', internalType: 'uint40', type: 'uint40' },
+          { name: 'deposited', internalType: 'uint128', type: 'uint128' },
+          { name: 'withdrawn', internalType: 'uint128', type: 'uint128' },
+          { name: 'refunded', internalType: 'uint128', type: 'uint128' },
+          {
+            name: 'withdrawableAmount',
+            internalType: 'uint128',
+            type: 'uint128',
+          },
+          { name: 'status', internalType: 'uint8', type: 'uint8' },
+          { name: 'isCancelable', internalType: 'bool', type: 'bool' },
+          { name: 'isDepleted', internalType: 'bool', type: 'bool' },
+          { name: 'wasCanceled', internalType: 'bool', type: 'bool' },
+        ],
+      },
+    ],
+    stateMutability: 'view',
+  },
+  { type: 'error', inputs: [], name: 'SablierV2Lockup_InvalidQueryRange' },
+  { type: 'error', inputs: [], name: 'ZeroAddress' },
+] as const
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 // OVRFLORequestBook
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 

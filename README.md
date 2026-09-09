@@ -216,9 +216,9 @@ Wrap reserve for one column. Holds the underlying that backs 1:1 wrapped ovrfloT
 
 ERC20 + Permit receipt token, one per column. The reserve constructs it. Two named immutable minters, fixed at construction: `vault()` (mint on deposit, burn on claim) and `reserve()` (mint on wrap, burn on unwrap). Neither authority can move. Name/symbol are full ERC20 strings, reviewed off-chain before registration (`OVRFLO ` / `ovrflo` prefix). Not OZ Ownable.
 
-### OVRFLOStreamLens.sol
+### OVRFLOLens.sol
 
-Deployless read lens. The frontend ships creation bytecode and calls via `eth_call` with no `to`. Not a DeploySize deployable. Holds no storage and is never in a transaction path.
+Deployed read lens. The lockup is a constructor immutable. The frontend calls `streamsOfOwner` and `streamsOfOwnerIn` on `NEXT_PUBLIC_OVRFLO_LENS`. Bootstrap fails if the lens has no code or `lockup()` does not match `factory.ovrfloStream()`. Not on any write path.
 
 ## User Flows
 

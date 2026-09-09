@@ -26,6 +26,7 @@ const bootstrap: ReadyProtocolBootstrap = {
   status: "ready",
   factory,
   stream,
+  lens: stream,
   blockNumber: 1n,
   vaults: [
     {
@@ -38,6 +39,8 @@ const bootstrap: ReadyProtocolBootstrap = {
       retiredLendings: [],
     },
   ],
+  markets: [],
+  books: [],
 };
 
 const client = {

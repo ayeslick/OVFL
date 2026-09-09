@@ -1,0 +1,46 @@
+# Scratch decision record — schema: docs/maps/SCHEMAS.md §4
+summary_ref: "docs/plans/2026-09-09-001-refactor-frontend-reduction-plan.md tickets 03-05"
+
+goal: >
+  Wallet-held stream rows come from an ordinary eth_call to the deployed
+  OVRFLOLens. Deployless stateOverride and per-row ok flags go away.
+
+state_keys_touched:
+  - watch.heldStreams
+
+writers_readers:
+  - writes: web/lib/protocol/streams.ts
+  - reads: web/hooks/useStreams.ts
+  - reads: web/hooks/useCompleteStreams.ts
+
+trust_domains:
+  - fact: stream owner
+    domain: on-chain
+    moved_from: deployless OVRFLOStreamLens eth_call
+  - fact: wasCanceled and isDepleted
+    domain: on-chain
+    moved_from: statusOf-derived flags in the plain fallback
+
+rejected_alternatives:
+  - option: Keep a per-id getStream fallback when the lens reverts
+    why_not: That path copied status-derived flags and hid a whole-call failure.
+  - option: Discover the lens from the factory
+    why_not: The factory does not store the lens.
+
+invariants_held:
+  - invariant: Disconnected UI does not query the zero owner
+    how: isConfiguredAddress gates the hook and the protocol client.
+  - invariant: Owner mismatch is unavailable, not a valid row
+    how: finalizePage compares each row.owner to the queried owner.
+  - invariant: Resource-limit of a complete read windows once
+    how: isResourceLimitFailure switches to streamsOfOwnerIn and never retries streamsOfOwner.
+
+risks:
+  - risk: Production RPC complete-read ceilings are unmeasured
+    residual: Ticket 04 records blocked and picks 250/50 from in-process gas.
+
+diff_hints:
+  - path: web/lib/protocol/streams.ts
+    why: Owner hydration is readContract on NEXT_PUBLIC_OVRFLO_LENS.
+  - path: web/lib/generated/lens-bytecode.ts
+    why: Ticket 05 deletes this file.

@@ -17,7 +17,7 @@
     "lint:state-index": "cd .. && node tools/scripts/generate-state-function-index.mjs --check",
     "lint:maps": "npm run lint:maps-presence && npm run lint:state-index",
     "lint:security": "npm run lint && npm run lint:banned-patterns",
-    "pretest": "npm run typegen && bash scripts/check-banned-patterns.sh && npm run lint:deps && node scripts/check-ovrflo-stream-bytecode.mjs && node scripts/check-lens-bytecode.mjs",
+    "pretest": "npm run typegen && bash scripts/check-banned-patterns.sh && npm run lint:deps && node scripts/check-ovrflo-stream-bytecode.mjs",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "npm run pretest && bddgen && playwright test",
@@ -36,9 +36,6 @@
     "bootstrap:e2e": "cd .. && ./tools/scripts/bootstrap-e2e.sh"
   },
   "dependencies": {
-    "@morpho-org/viem-dlc": "0.0.16",
-    "@reown/appkit": "1.8.23",
-    "@reown/appkit-adapter-wagmi": "1.8.23",
     "@tanstack/react-query": "5.90.12",
     "next": "16.3.4",
     "react": "19.2.4",

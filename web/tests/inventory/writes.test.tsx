@@ -51,6 +51,10 @@ vi.mock("wagmi", () => ({
   useReadContracts: () => ({ data: undefined, isLoading: false }),
 }));
 
+vi.mock("@/components/assets/ConverterFlow", () => ({
+  ConverterFlow: () => <div data-testid="converter-flow">CONVERT</div>,
+}));
+
 vi.mock("@/hooks/useWriteFlow", () => ({
   useWriteFlow: () => ({
     writeContract: writeFx.writeContract,
@@ -207,7 +211,7 @@ describe.each(TRANSACTING_WIDTHS)("inventory — claim / unwrap / wrap / repay /
     expect(screen.getByText("RECEIVED")).toBeInTheDocument();
     expect(screen.getByText(`0.25000 ${SYMBOL}`)).toBeInTheDocument();
     expect(screen.getByText(/RECEIVED 0\.25000 ovrfloTEST/)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "UNWRAP TO UNDERLYING" })).toBeInTheDocument();
+    expect(screen.getByTestId("converter-flow")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: `KEEP ${SYMBOL}` })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "CLAIM PT" })).not.toBeInTheDocument();
     expect(screen.getByText(/separate exits/i)).toBeInTheDocument();
@@ -449,10 +453,6 @@ describe.each(TRANSACTING_WIDTHS)("inventory — claim / unwrap / wrap / repay /
     );
     const shortfall = document.querySelector("[data-ui='UI-REVIEW-REPAY-PREPARE']");
     expect(shortfall).toHaveAttribute("data-state", "shortfall");
-    expect(screen.getByRole("link", { name: "WRAP SHORTFALL" })).toHaveAttribute(
-      "href",
-      `/assets/?return=repay&loan=${loan.id.toString()}`,
-    );
     expect(screen.getByRole("button", { name: "REPAY" })).toBeDisabled();
     prepare.unmount();
 

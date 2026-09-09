@@ -7,17 +7,6 @@ const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const WEB_ROOT = resolve(SCRIPT_DIR, "..");
 export const BASE_HEADERS_PATH = resolve(WEB_ROOT, "build", "security-headers.base.json");
 
-const WALLET_ORIGINS_HTTP = [
-  "https://*.walletconnect.com",
-  "https://*.walletconnect.org",
-  "https://*.reown.com",
-];
-const WALLET_ORIGINS_WSS = [
-  "wss://*.walletconnect.com",
-  "wss://*.walletconnect.org",
-  "wss://*.reown.com",
-];
-
 /** @param {Record<string, string | undefined>} environment */
 export function buildSecurityHeaders(environment = process.env) {
   const profile = environment.NEXT_PUBLIC_RUNTIME_PROFILE ?? "production";
@@ -32,18 +21,10 @@ export function buildSecurityHeaders(environment = process.env) {
   }
 
   const rpcOrigins = configuredRpcOrigins(environment, profile);
-  const historicalOrigin = requiredOrigin(
-    environment.NEXT_PUBLIC_HISTORICAL_RPC_URL ??
-      (profile === "local" ? environment.NEXT_PUBLIC_RPC_URL ?? "http://127.0.0.1:8545" : undefined),
-    "NEXT_PUBLIC_HISTORICAL_RPC_URL",
-    profile,
-  );
   const connectSrc = [
     "'self'",
-    ...new Set([...rpcOrigins, historicalOrigin]),
+    ...rpcOrigins,
     "https://api-v2.pendle.finance",
-    ...WALLET_ORIGINS_HTTP,
-    ...WALLET_ORIGINS_WSS,
   ];
 
   const csp = [
@@ -57,7 +38,7 @@ export function buildSecurityHeaders(environment = process.env) {
     "img-src 'self' data: https:",
     "font-src 'self' data:",
     `connect-src ${connectSrc.join(" ")}`,
-    `frame-src ${WALLET_ORIGINS_HTTP.join(" ")}`,
+    "frame-src 'none'",
   ].join("; ");
   if (profile === "production" && /localhost|127\.0\.0\.1|\[::1\]/i.test(csp)) {
     throw new Error("build-csp: production CSP contains a localhost origin");

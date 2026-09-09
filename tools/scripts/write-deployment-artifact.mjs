@@ -13,6 +13,8 @@ const SABLIER_LL_SELECTOR = "0x94cd301a";
 const SABLIER_SELECTOR = "0x482879aa";
 // cast sig "ovrfloStream()"
 const OVRFLO_STREAM_SELECTOR = "0xce6bc9b5";
+// cast sig "lockup()"
+const LENS_LOCKUP_SELECTOR = "0x06490f47";
 // cast sig "reserve()"
 const RESERVE_SELECTOR = "0xcd3293de";
 // cast sig "ovrfloToReserve(address)"
@@ -125,6 +127,11 @@ export async function verifyDeploymentArtifactInput({
     supplied: current.reserve,
     request: rpcRequest,
   });
+  const lens = await deriveLensAddress({
+    supplied: current.lens,
+    stream,
+    request: rpcRequest,
+  });
 
   const verified = {
     ...current,
@@ -142,6 +149,7 @@ export async function verifyDeploymentArtifactInput({
     lendingDeploymentBlockHash: lendingBlock.hash,
     stream,
     reserve,
+    lens,
   };
   if (requireExistingIdentity) {
     for (const field of [
@@ -154,6 +162,7 @@ export async function verifyDeploymentArtifactInput({
       "lendingDeploymentBlockHash",
       "stream",
       "reserve",
+      "lens",
     ]) {
       if (!sameHexOrValue(current[field], verified[field])) {
         throw new Error(`${field} does not match the chain-verified deployment identity`);
@@ -227,6 +236,22 @@ async function deriveReserveAddress({ factory, ovrflo, supplied, request }) {
     throw new Error("supplied reserve does not match vault.reserve()");
   }
   return vaultReserve;
+}
+
+async function deriveLensAddress({ supplied, stream, request }) {
+  const lens = requiredAddress(supplied, "lens");
+  const code = await request("eth_getCode", [lens, "latest"]);
+  if (!code || code === "0x") {
+    throw new Error("supplied lens has no code");
+  }
+  const boundLockup = decodeReturnedAddress(
+    await request("eth_call", [{ to: lens, data: LENS_LOCKUP_SELECTOR }, "latest"]),
+    "lens.lockup()",
+  );
+  if (!sameHex(boundLockup, stream)) {
+    throw new Error("lens.lockup() does not match factory.ovrfloStream()");
+  }
+  return lens;
 }
 
 function decodeReturnedAddress(result, name) {

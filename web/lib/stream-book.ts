@@ -9,9 +9,6 @@ import {
   type ReadOutcomeMetadata,
 } from "@/lib/read-outcome";
 
-/** Sequential auto-fetch on all-ineligible pages, then LOAD MORE. */
-export const AUTO_INELIGIBLE_PAGE_CAP = 4;
-
 export type BookFields = {
   sourceCount: bigint;
   renderCount: number;

@@ -49,7 +49,10 @@ import {OVRFLOFactory} from "../src/OVRFLOFactory.sol";
 ///     `stream.factory()`, `stream.admin()`, or `comptroller.admin()`.
 /// 12. The Safe calls `prepareOracle`, waits until the TWAP window is ready,
 ///     then `addMarket`, then `setLendingTickSpacing`.
-/// 13. Write the deployment artifact. The writer derives the stream address
+/// 13. Deploy `OVRFLOLens(stream)`. Read `lockup() == factory.ovrfloStream()`.
+///     Write `lens` on the artifact. Frontend `NEXT_PUBLIC_OVRFLO_LENS` is
+///     required. The factory does not store the lens.
+/// 14. Write the deployment artifact. The writer derives the stream address
 ///     from the vault and cross-checks lending (SC24). The artifact's
 ///     `reserve` field follows the same paired-optional consume rule as
 ///     `ovrflo` and `lending`: both present or both derived. Frontend

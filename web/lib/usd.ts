@@ -59,19 +59,11 @@ export function tokenUsd8(tokenWei: bigint, tokenUsd: Usd8): Usd8 {
 export function priceFromRecipe(args: {
   kind: UsdRecipeKind;
   feedUsd8: Usd8;
-  shareRate?: bigint;
-  ethUsd8?: Usd8;
+  shareRate: bigint;
 }): Usd8 {
-  if (args.kind === "chainlink-usd-direct") return args.feedUsd8;
-  if (args.kind === "chainlink-usd-times-share-rate") {
-    const shareRate = args.shareRate ?? 0n;
-    if (args.feedUsd8 <= 0n || shareRate <= 0n) return usd8(0n);
-    return usd8(mulDiv(args.feedUsd8, shareRate, WAD));
-  }
-  const ethUsd = args.ethUsd8 ?? usd8(0n);
-  const assetPerEth = args.shareRate ?? 0n;
-  if (ethUsd <= 0n || assetPerEth <= 0n) return usd8(0n);
-  return usd8(mulDiv(ethUsd, assetPerEth, WAD));
+  if (args.kind !== "chainlink-usd-times-share-rate") return usd8(0n);
+  if (args.feedUsd8 <= 0n || args.shareRate <= 0n) return usd8(0n);
+  return usd8(mulDiv(args.feedUsd8, args.shareRate, WAD));
 }
 
 export function classifyUsd(args: {
@@ -82,32 +74,21 @@ export function classifyUsd(args: {
   cutoff?: bigint;
   kind: UsdRecipeKind;
   feedDecimals: number;
-  shareRate?: bigint;
-  ethUsdRound?: ChainlinkRound;
+  shareRate: bigint;
 }): UsdQuote {
   const cutoff = args.cutoff ?? USD_ABSOLUTE_CUTOFF_SECONDS;
   if (!isCompleteRound(args.round)) {
     return { status: "unavailable", reason: "incomplete" };
   }
-  if (args.kind === "chainlink-eth-usd-times-eth-rate") {
-    if (!args.ethUsdRound || !isCompleteRound(args.ethUsdRound)) {
-      return { status: "unavailable", reason: "incomplete" };
-    }
-  }
-  const needsShare = args.kind !== "chainlink-usd-direct";
-  if (needsShare && (args.shareRate === undefined || args.shareRate <= 0n)) {
+  if (args.shareRate <= 0n) {
     return { status: "unavailable", reason: "non-positive" };
   }
 
   const feedUsd8 = scaleFeedToUsd8(args.round.answer, args.feedDecimals);
-  const ethUsd8 = args.ethUsdRound
-    ? scaleFeedToUsd8(args.ethUsdRound.answer, CHAINLINK_USD_DECIMALS)
-    : undefined;
   const priceQ = priceFromRecipe({
     kind: args.kind,
     feedUsd8,
     shareRate: args.shareRate,
-    ethUsd8,
   });
   if (priceQ <= 0n) {
     return { status: "unavailable", reason: "non-positive" };

@@ -469,8 +469,8 @@ describe("matured claim capacity", () => {
   });
 });
 
-describe("Borrow projected-route definitions", () => {
-  it("replaces a consumed candidate with fresh hydrated backup liquidity and freezes ascending ids", () => {
+describe("Borrow definitions", () => {
+  it("submits previewBorrow then exact borrow without lender ids", () => {
     const borrow = cases.find(({ intent }) => intent.type === "borrow")!;
     const action = expectReady(borrow.intent, borrow.snapshot);
     expect(action.call).toMatchObject({
@@ -478,56 +478,9 @@ describe("Borrow projected-route definitions", () => {
       args: [marketAddress, 1_000, 4n * WAD, 31n, (4n * WAD * 9_925n) / 10_000n, account],
     });
     expect(action.review.route).toEqual({
-      ids: [4n],
-      amounts: [9n * WAD],
+      ids: [],
+      amounts: [],
       aprBps: 1_000,
-    });
-  });
-
-  it("freezes unique selected liquidity ids in strict ascending order", () => {
-    const borrow = cases.find(({ intent }) => intent.type === "borrow")!;
-    if (borrow.snapshot.type !== "borrow") throw new Error("wrong fixture");
-    const action = expectReady(
-      { type: "borrow", amount: "10", streamId: 31n },
-      {
-        ...borrow.snapshot,
-        routing: fresh({
-          ...borrow.snapshot.routing.data!,
-          candidateIds: [5n, 2n, 4n, 3n],
-          aggregateDepth: 15n * WAD,
-        }),
-        hydration: fresh({
-          positions: [
-            position(5n, 3n * WAD),
-            position(2n, 3n * WAD, account),
-            position(4n, 9n * WAD),
-            position(3n, 0n),
-          ],
-        }),
-        quote: fresh({
-          ...borrow.snapshot.quote.data!,
-          amount: 10n * WAD,
-          actualBorrow: 10n * WAD,
-          feeAmount: 25_000_000_000_000_000n,
-          obligation: 11n * WAD,
-          residual: WAD,
-          minAcceptable: 9_925_000_000_000_000_000n,
-        }),
-      },
-    );
-    expect(action.review.route?.ids).toEqual([2n, 4n]);
-  });
-
-  it("reports incomplete when a projected candidate lacks fresh hydration", () => {
-    const borrow = cases.find(({ intent }) => intent.type === "borrow")!;
-    if (borrow.snapshot.type !== "borrow") throw new Error("wrong fixture");
-    const result = buildAction(borrow.intent, {
-      ...borrow.snapshot,
-      hydration: fresh({ positions: [position(2n, 3n * WAD, account), position(4n, 9n * WAD)] }),
-    });
-    expect(result).toMatchObject({
-      status: "invalid",
-      errors: [{ code: "routing-incomplete" }],
     });
   });
 
@@ -678,18 +631,6 @@ describe("frozen review revalidation (AE6)", () => {
     const borrow = cases.find(({ intent }) => intent.type === "borrow")!;
     const reviewed = expectReady(borrow.intent, borrow.snapshot);
     if (borrow.snapshot.type !== "borrow") throw new Error("wrong fixture");
-
-    const routeChanged = expectReady(borrow.intent, {
-      ...borrow.snapshot,
-      routing: fresh({
-        ...borrow.snapshot.routing.data!,
-        candidateIds: [3n, 2n, 5n],
-      }),
-      hydration: fresh({
-        positions: [position(2n, 3n * WAD, account), position(3n, 0n), position(5n, 9n * WAD)],
-      }),
-    });
-    expect(revalidateReview(reviewed.review, routeChanged.review)).toMatchObject({ status: "needs-review" });
 
     const economicsChanged = expectReady(borrow.intent, {
       ...borrow.snapshot,

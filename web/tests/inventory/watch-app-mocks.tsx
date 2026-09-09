@@ -19,10 +19,6 @@ vi.mock("wagmi", () => ({
   }),
 }));
 
-vi.mock("@reown/appkit/react", () => ({
-  useAppKit: () => ({ open: vi.fn() }),
-}));
-
 vi.mock("wallet-runtime", () => ({
   WalletButton: () => <button type="button">CONNECT WALLET</button>,
   ensureWalletKit: () => undefined,

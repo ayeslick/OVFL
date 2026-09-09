@@ -1,46 +1,18 @@
-import { http, type Transport } from "viem";
-import { defaultShouldThrow, failover, logsDivider } from "@morpho-org/viem-dlc/transports";
-
-// KD18 runtime-dependency exception: @morpho-org/viem-dlc npm 0.0.16 wraps
-// public-read RPC only. Release tag provenance is this commit. 7ea8e70 is later
-// reviewed documentation context and is not package provenance. Wallet writes,
-// historical HTTP, and TanStack Query stay outside this package.
-export const VIEM_DLC_NPM_VERSION = "0.0.16" as const;
-export const VIEM_DLC_RELEASE_COMMIT = "0df02a9a79bce8ed0a98974034d34cf5c8de7e11" as const;
+import { type Transport, type TransportConfig } from "viem";
 
 export type RpcFailureKind =
   | "forbidden"
   | "rate_limited"
   | "quota_exhausted"
   | "revoked_credential"
-  | "historical_capability"
   | "execution_reverted"
   | "unknown_block"
   | "transport_unavailable"
   | "unknown";
 
-export type PublicReadProviderPolicy = {
-  maxBlockRange: number;
-  maxRequestsPerSecond: number;
-  maxBurstRequests: number;
-  maxConcurrentRequests: number;
-};
+export const READ_TIMEOUT_MS = 30_000;
 
-// Same numeric policy for every URL. Isolation comes from one rateLimiter
-// instance per URL, not from different numbers. Ticket 13 consumes
-// maxBlockRange for bounded log-range reads.
-export const publicReadProviderPolicy: PublicReadProviderPolicy = {
-  maxBlockRange: 100_000,
-  maxRequestsPerSecond: 10,
-  maxBurstRequests: 5,
-  maxConcurrentRequests: 5,
-};
-
-// Sieve ceiling is far above a Transfer / Deposited / Borrowed / Supplied log.
-// A tight ceiling would drop a candidate identifier.
-export const PUBLIC_READ_LOG_MAX_BYTES = 1_048_576;
-
-type ErrorShape = {
+export type RpcFailureShape = {
   code?: unknown;
   message?: unknown;
   status?: unknown;
@@ -49,8 +21,6 @@ type ErrorShape = {
   details?: unknown;
   shortMessage?: unknown;
 };
-
-const publicReadPolicies = new WeakMap<Transport, PublicReadProviderPolicy>();
 
 export function classifyRpcFailure(error: unknown): RpcFailureKind {
   if (typeof error === "string") return classifyRpcFailure({ message: error });
@@ -74,13 +44,6 @@ export function classifyRpcFailure(error: unknown): RpcFailureKind {
     return "revoked_credential";
   }
   if (
-    /block range|response size|historical (?:logs?|range)|archive (?:data|node)|finalized.*unsupported/.test(
-      message,
-    )
-  ) {
-    return "historical_capability";
-  }
-  if (
     code === 3 ||
     /execution reverted|contractfunctionreverted|call reverted|revert reason/.test(message)
   ) {
@@ -101,86 +64,66 @@ export function classifyRpcFailure(error: unknown): RpcFailureKind {
   return "unknown";
 }
 
-function errorChain(error: unknown): ErrorShape[] {
-  const found: ErrorShape[] = [];
+function errorChain(error: unknown): RpcFailureShape[] {
+  const found: RpcFailureShape[] = [];
   const seen = new Set<unknown>();
   let current = error;
   while (current && typeof current === "object" && !seen.has(current)) {
     seen.add(current);
-    const shape = current as ErrorShape;
+    const shape = current as RpcFailureShape;
     found.push(shape);
     current = shape.cause;
   }
   return found;
 }
 
-export function orderedPublicReadPolicy(policy: PublicReadProviderPolicy) {
-  return [
-    { maxBlockRange: policy.maxBlockRange },
-    { maxRequestsPerSecond: policy.maxRequestsPerSecond },
-    { maxBurstRequests: policy.maxBurstRequests },
-    { maxConcurrentRequests: policy.maxConcurrentRequests },
-  ] as const;
-}
-
-export function getPublicReadPolicy(transport: Transport): PublicReadProviderPolicy {
-  const policy = publicReadPolicies.get(transport);
-  if (!policy) {
-    throw new Error("Transport has no public-read provider policy");
-  }
-  return policy;
-}
-
-function publicReadShouldThrow(error: unknown): boolean {
+function shouldFailClosed(error: unknown): boolean {
   const kind = classifyRpcFailure(error);
-  return kind === "execution_reverted" || kind === "unknown_block" || defaultShouldThrow(error);
+  return kind === "execution_reverted" || kind === "unknown_block";
 }
 
-export function wrapPublicReadTransport(
-  inner: Transport,
-  policy: PublicReadProviderPolicy = publicReadProviderPolicy,
-): Transport {
-  const [range, sustained, burst, concurrency] = orderedPublicReadPolicy(policy);
-  if (range.maxBlockRange < 1) {
-    throw new Error("Public-read maxBlockRange must be at least 1");
-  }
-  const noRetryInner: Transport = (opts) => inner({ ...opts, retryCount: 0 });
-  // logsDivider composes sieve, enricher, and rateLimiter. blockTimestamp stays
-  // off on this shared wrap: portfolio enrichment is candidate merge, not headers.
-  const wrapped = logsDivider(noRetryInner, [
-    { maxBlockRange: range.maxBlockRange },
-    { retryCount: 0, retryDelay: 0, blockTimestamp: false },
-    { maxBytes: PUBLIC_READ_LOG_MAX_BYTES },
-    {
-      maxRequestsPerSecond: sustained.maxRequestsPerSecond,
-      maxBurstRequests: burst.maxBurstRequests,
-      maxConcurrentRequests: concurrency.maxConcurrentRequests,
-    },
-  ]);
-  // viem-dlc types the transport value as unknown. wagmi's Transport requires Record.
-  publicReadPolicies.set(wrapped as Transport, {
-    maxBlockRange: range.maxBlockRange,
-    maxRequestsPerSecond: sustained.maxRequestsPerSecond,
-    maxBurstRequests: burst.maxBurstRequests,
-    maxConcurrentRequests: concurrency.maxConcurrentRequests,
-  });
-  return wrapped as Transport;
-}
-
+/**
+ * Ordinary-read transport chain. A revert or unknown-block pin miss stays on
+ * the provider that returned it. Transport failures move to the next URL.
+ */
 export function createOrderedReadTransport<const T extends readonly Transport[]>(
   transports: T,
-) {
+): Transport {
   if (transports.length === 0) {
     throw new Error("At least one ordinary-read RPC transport is required");
   }
-  return failover(
-    transports.map((transport) => wrapPublicReadTransport(transport)),
-    { shouldThrow: publicReadShouldThrow },
-  ) as Transport;
-}
-
-export function createHistoricalTransport(url: string) {
-  // One synchronization owns exactly one HTTP transport. It may retry the same
-  // transport, but it never inherits the ordinary-read fallback set.
-  return http(url);
+  return ({ chain, pollingInterval, timeout, retryCount: _retryCount, ...rest }) => {
+    const instances = transports.map((transport) =>
+      transport({
+        chain,
+        pollingInterval,
+        timeout: timeout ?? READ_TIMEOUT_MS,
+        retryCount: 0,
+        ...rest,
+      }),
+    );
+    const config = {
+      key: "ovrflo-ordered",
+      name: "OVRFLO ordered read",
+      request: async () => undefined as never,
+      retryCount: 0,
+      timeout: timeout ?? READ_TIMEOUT_MS,
+      type: "ovrflo-ordered-fallback",
+    } satisfies TransportConfig;
+    return {
+      config,
+      async request(args, options) {
+        let lastError: unknown;
+        for (const instance of instances) {
+          try {
+            return await instance.request(args, options);
+          } catch (error) {
+            if (shouldFailClosed(error)) throw error;
+            lastError = error;
+          }
+        }
+        throw lastError;
+      },
+    };
+  };
 }

@@ -8,6 +8,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {OVRFLO} from "../../src/OVRFLO.sol";
 import {OVRFLOFactory} from "../../src/OVRFLOFactory.sol";
 import {OVRFLOLending} from "../../src/OVRFLOLending.sol";
+import {OVRFLOLens} from "../../src/OVRFLOLens.sol";
 import {OVRFLOToken} from "../../src/OVRFLOToken.sol";
 import {OVRFLOTestFixtures} from "./OVRFLOTestFixtures.sol";
 
@@ -81,6 +82,8 @@ abstract contract OVRFLOSeedRunner is Script, StdCheats, OVRFLOTestFixtures {
         factory.addMarket(address(ovrflo), SECONDARY_MARKET, MIN_TWAP_DURATION, 10);
         OVRFLOLending lending = _deployAndRegisterLending(factory, ovrflo);
         _deployRequestBookAs(factory, lending);
+        OVRFLOLens deployedLens = new OVRFLOLens(factory.ovrfloStream());
+        require(address(deployedLens.lockup()) == factory.ovrfloStream(), "OVRFLOSeedRunner: lens lockup");
 
         deal(PRIMARY_PT, devWallet, PT_SEED_AMOUNT);
         deal(SECONDARY_PT, devWallet, PT_SEED_AMOUNT);
@@ -97,8 +100,8 @@ abstract contract OVRFLOSeedRunner is Script, StdCheats, OVRFLOTestFixtures {
         require(ownerWstethBal > 0, "OVRFLOSeedRunner: zero wstETH minted");
         require(IERC20(WSTETH).transfer(devWallet, ownerWstethBal), "OVRFLOSeedRunner: wstETH transfer failed");
 
-        _writeDeployments(networkKey, factory, ovrflo, token, lending, devWallet);
-        _logSummary(networkKey, owner, devWallet, factory, ovrflo, token, lending);
+        _writeDeployments(networkKey, factory, ovrflo, token, lending, deployedLens, devWallet);
+        _logSummary(networkKey, owner, devWallet, factory, ovrflo, token, lending, deployedLens);
     }
 
     function _deployAndRegisterLending(OVRFLOFactory factory, OVRFLO ovrflo) private returns (OVRFLOLending lending) {
@@ -120,6 +123,7 @@ abstract contract OVRFLOSeedRunner is Script, StdCheats, OVRFLOTestFixtures {
         OVRFLO ovrflo,
         OVRFLOToken token,
         OVRFLOLending lending,
+        OVRFLOLens deployedLens,
         address devWallet
     ) private {
         string memory obj = "ovrflo_deployments";
@@ -133,6 +137,7 @@ abstract contract OVRFLOSeedRunner is Script, StdCheats, OVRFLOTestFixtures {
         vm.serializeAddress(obj, "reserve", ovrflo.reserve());
         vm.serializeAddress(obj, "lending", address(lending));
         vm.serializeAddress(obj, "requestBook", lending.router());
+        vm.serializeAddress(obj, "lens", address(deployedLens));
         vm.serializeAddress(obj, "devWallet", devWallet);
         string memory out = vm.serializeUint(obj, "chainId", block.chainid);
         vm.writeJson(out, string.concat("deployments/", networkKey, ".json"));
@@ -145,7 +150,8 @@ abstract contract OVRFLOSeedRunner is Script, StdCheats, OVRFLOTestFixtures {
         OVRFLOFactory factory,
         OVRFLO ovrflo,
         OVRFLOToken token,
-        OVRFLOLending lending
+        OVRFLOLending lending,
+        OVRFLOLens deployedLens
     ) private view {
         console.log("=== OVRFLO seed complete ===");
         console.log("network:  ", networkKey);
@@ -157,6 +163,7 @@ abstract contract OVRFLOSeedRunner is Script, StdCheats, OVRFLOTestFixtures {
         console.log("reserve:  ", ovrflo.reserve());
         console.log("lending:  ", address(lending));
         console.log("requestBook:", lending.router());
+        console.log("lens:     ", address(deployedLens));
         console.log("devWallet:", devWallet);
     }
 }

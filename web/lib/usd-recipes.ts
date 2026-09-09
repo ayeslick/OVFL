@@ -1,14 +1,11 @@
 import { isAddressEqual, type Address } from "viem";
 import { CHAINLINK_STETH_USD, WSTETH_ADDRESS } from "./config";
 
-export type UsdRecipeKind =
-  | "chainlink-usd-times-share-rate"
-  | "chainlink-usd-direct"
-  | "chainlink-eth-usd-times-eth-rate";
+export type UsdRecipeKind = "chainlink-usd-times-share-rate";
 
 export type UsdShareRateSpec = {
   contract: Address;
-  functionName: "stEthPerToken" | "getPooledEthByShares";
+  functionName: "stEthPerToken";
 };
 
 export type UsdRecipe = {
@@ -17,8 +14,7 @@ export type UsdRecipe = {
   aggregator: Address;
   feedDecimals: number;
   heartbeatSeconds: bigint;
-  shareRate?: UsdShareRateSpec;
-  ethUsdAggregator?: Address;
+  shareRate: UsdShareRateSpec;
   explorerVerifiedAt: string;
   explorerUrl: string;
   maxSourceDeviationBps: bigint;

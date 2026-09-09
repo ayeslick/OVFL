@@ -6,8 +6,7 @@ import { lookupUsdRecipe, type UsdRecipe } from "./usd-recipes";
 export type UsdExecutionReads = {
   underlying: AddressLike;
   round: ChainlinkRound;
-  shareRate?: bigint;
-  ethUsdRound?: ChainlinkRound;
+  shareRate: bigint;
   assetDecimals: number;
   now: bigint;
 };
@@ -64,7 +63,6 @@ function encloseTokenNative(
     kind: recipe.kind,
     feedDecimals: recipe.feedDecimals,
     shareRate: reads.shareRate,
-    ethUsdRound: reads.ethUsdRound,
   });
   if (quote.status !== "available") {
     if (quote.reason === "heartbeat") return { status: "blocked", reason: "stale" };

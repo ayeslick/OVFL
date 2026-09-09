@@ -5,12 +5,10 @@ import { graphToQueuedTx } from "./action-graph";
 import type { ActionExecutionDraft, ExecutionPlan } from "./action-runtime";
 import type { ActionIdentity, ReadyAction } from "./actions/types";
 import type { ActionType } from "./types";
-import type { QueuedTx } from "./claim-all";
+import type { QueuedTx } from "./queued-tx";
 import { confirmedStepIds } from "./composite-recovery";
 import {
-  createLiveBorrowProjectionLoader,
   createLiveExecutionPlan,
-  type LiveBorrowProjectionLoader,
   type LiveClient,
   type LiveMarketScope,
   type LiveWriteArgs,
@@ -124,12 +122,9 @@ export async function rebuildProtocolGraphStep(args: {
   scope: LiveMarketScope;
   client: LiveClient;
   bootstrap: ReadyProtocolBootstrap;
-  loadBorrowProjection?: LiveBorrowProjectionLoader;
 }): Promise<{ status: "ready"; plan: ExecutionPlan }> {
   const result = await createLiveExecutionPlan(args.raw, args.identity, args.scope, args.client, {
     bootstrap: args.bootstrap,
-    loadBorrowProjection:
-      args.loadBorrowProjection ?? createLiveBorrowProjectionLoader(args.client),
   });
   if (!result) {
     throw new Error("Graph step is not a supported protocol call");

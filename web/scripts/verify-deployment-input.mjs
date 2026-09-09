@@ -4,6 +4,7 @@ import { verifyDeploymentArtifactInput } from "../../tools/scripts/write-deploym
 
 const FIELD_BINDINGS = [
   ["factory", "NEXT_PUBLIC_OVRFLO_FACTORY"],
+  ["lens", "NEXT_PUBLIC_OVRFLO_LENS"],
   ["factoryDeploymentBlock", "NEXT_PUBLIC_FACTORY_DEPLOYMENT_BLOCK"],
   ["factoryDeploymentBlockHash", "NEXT_PUBLIC_FACTORY_DEPLOYMENT_BLOCK_HASH"],
   ["projectionSchemaVersion", "NEXT_PUBLIC_PROJECTION_SCHEMA_VERSION"],

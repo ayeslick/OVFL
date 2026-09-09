@@ -27,7 +27,10 @@ export function ConverterFlow({
   repayHref,
   signingAllowed,
 }: {
-  market: MarketInfo | null;
+  market: Pick<
+    MarketInfo,
+    "vault" | "reserve" | "lending" | "market" | "underlying" | "ovrfloToken" | "ptToken" | "expiryCached"
+  > | null;
   underlyingSymbol: string;
   ovrfloSymbol: string;
   repayHref?: string;

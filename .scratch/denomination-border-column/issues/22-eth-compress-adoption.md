@@ -4,8 +4,8 @@
 
 **Blocked by:** 21 with an `evaluate` decision
 
-**Status:** ready-for-agent
-**Labels:** ready-for-agent
+**Status:** cancelled
+**Labels:** wontfix
 
 ## Session prompt (paste into a new chat)
 
@@ -56,3 +56,7 @@ After local verification, mark ticket checkboxes done and set Status: resolved.
 ## Plan unit
 
 CS6-U2 in `docs/plans/2026-08-22-001-refactor-denomination-switch-border-column-plan.md`
+
+## Comments
+
+2026-09-09: Cancelled. Ticket 21 recorded `do not adopt`. No install.

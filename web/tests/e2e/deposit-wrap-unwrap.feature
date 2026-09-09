@@ -1,5 +1,5 @@
-Feature: Assets converter and stream creation
-  Entry: /assets three-bay converter, or CREATE STREAM for a PT deposit.
+Feature: Create conversion and stream creation
+  Entry: /create wrap, unwrap, hosted convert, and PT deposit.
   Wrap and unwrap are 1:1 against the tracked wrap reserve. Deposit mints
   ovrfloToken and a stream, then offers a borrow handoff.
 

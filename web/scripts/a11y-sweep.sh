@@ -30,7 +30,7 @@ ROUTES=(
   "$BASE_URL/create/"
   "$BASE_URL/borrow/"
   "$BASE_URL/supply/"
-  "$BASE_URL/assets/"
+  "$BASE_URL/create/"
 )
 
 # Optional: boot the dev server if nothing is listening on the port.

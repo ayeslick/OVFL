@@ -8,7 +8,7 @@ import { Converter } from "@/components/assets/Converter";
 import { wrapTrace } from "@/components/assets/trace";
 import { stubViewport, TRANSACTING_WIDTHS, UNDERLYING, SYMBOL, SCALE, noop } from "./fixtures";
 
-const TOPOLOGIES = ["watch", "supply", "borrow", "assets"] as const;
+const TOPOLOGIES = ["watch", "supply", "borrow", "create"] as const;
 const WAD = SCALE;
 const ready = (value: bigint) => ({ status: "ready" as const, value });
 

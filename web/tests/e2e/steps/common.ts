@@ -58,7 +58,7 @@ Given("I am on the borrow flow", async ({ page }) => {
 });
 
 Given("I am on the assets page", async ({ page }) => {
-  await page.goto("/assets");
+  await page.goto("/create");
 });
 
 Given("my wallet is connected", async ({ page }) => {
@@ -232,7 +232,7 @@ When("I follow the first-run deposit intent", async ({ page }) => {
 });
 
 Then("the assets route is open", async ({ page }) => {
-  await expect(page).toHaveURL(/\/assets\/?/);
+  await expect(page).toHaveURL(/\/create\/?/);
 });
 
 Then("the {string} lens is hidden", async ({ page }, label: string) => {

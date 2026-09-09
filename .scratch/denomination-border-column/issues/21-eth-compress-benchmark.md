@@ -4,8 +4,8 @@
 
 **Blocked by:** 12, 14, owner start-OK
 
-**Status:** ready-for-agent
-**Labels:** ready-for-agent
+**Status:** resolved
+**Labels:** wontfix
 
 ## Session prompt (paste into a new chat)
 
@@ -42,14 +42,18 @@ with evaluate or do not adopt. If do not adopt, mark ticket 22 cancelled.
 
 ## Acceptance criteria
 
-- [ ] Owner recorded start-OK on this ticket before the first code or bench write
+- [x] Owner recorded start-OK on this ticket before the first code or bench write
 - [ ] Evidence file lists the three named KD19 calls, each `rpcUrls` entry from `web/lib/config.ts`, wire bytes, latency, success class, response encoding, and `cache: cold`
 - [ ] Call 1 (vault-binding multicall) is measured and marked never-adopt
 - [ ] `streamsOfOwnerIn` used `COMPLETE_SET_WINDOW`, not `COMPLETE_SET_UNBOUNDED_MAX`
 - [ ] Three cold runs per call per URL; unstable success class or byte-delta sign produced STOP, not `evaluate`
-- [ ] Verdict is exactly `evaluate` or `do not adopt` per KD19
-- [ ] On `do not adopt`, no eth-compress runtime code or dependency remains; ticket 22 is cancelled
-- [ ] `web/package.json` has no `eth-compress` entry
+- [x] Verdict is exactly `evaluate` or `do not adopt` per KD19
+- [x] On `do not adopt`, no eth-compress runtime code or dependency remains; ticket 22 is cancelled
+- [x] `web/package.json` has no `eth-compress` entry
+
+## Comments
+
+2026-09-09: Frontend-reduction owner pin. Verdict `do not adopt` without measuring the deployless stack this campaign deletes. Evidence: `.scratch/denomination-border-column/cs6-eth-compress-evidence.md`. Ticket 22 cancelled. KD19 measurement checkboxes stay unchecked because those calls will not exist after the reduction.
 
 ## Plan unit
 

@@ -34,7 +34,7 @@ import type {
 import { actionError } from "./actions/types";
 import { applySlippageDown } from "./modal-logic";
 import { ZERO_ADDRESS } from "./config";
-import { MAX_ENUMERATION_IDS, MIN_STREAM_AMOUNT } from "./lending-math";
+import { MIN_STREAM_AMOUNT } from "./lending-math";
 import { readPreviewBorrow } from "@/components/borrow/quote";
 import type { ReadyProtocolBootstrap } from "./protocol-bootstrap";
 import { readyOutcome } from "./read-outcome";
@@ -73,18 +73,6 @@ export type LiveBlockSnapshot = {
   hash: Hex;
   timestamp: bigint;
 };
-export const LIVE_BORROW_MAX_ROUTE_IDS = 128;
-
-export type LiveBorrowProjectionLoader = (input: {
-  lending: Address;
-  market: Address;
-  aprBps: number;
-  block: LiveBlockSnapshot;
-}) => Promise<{
-  positions: readonly LiquidityPosition[];
-  aggregateDepth: bigint;
-}>;
-
 type LockupLinearStream = {
   sender: Address;
   startTime: number | bigint;
@@ -96,7 +84,6 @@ type LockupLinearStream = {
 };
 type LiveSnapshotOptions = {
   pinnedBlock?: LiveBlockSnapshot;
-  loadBorrowProjection?: LiveBorrowProjectionLoader;
   bootstrap: ReadyProtocolBootstrap;
 };
 
@@ -314,33 +301,6 @@ async function read<T>(
   request: Record<string, unknown>,
 ): Promise<T> {
   return client.readContract({ ...request, blockNumber } as never) as Promise<T>;
-}
-
-export function createLiveBorrowProjectionLoader(client: LiveClient): LiveBorrowProjectionLoader {
-  return async (input) => {
-    const nextId = await read<bigint>(client, input.block.number, {
-      address: input.lending,
-      abi: ovrfloLendingAbi,
-      functionName: "nextPositionId",
-    });
-    const last = nextId > 1n ? nextId - 1n : 0n;
-    const cap = last < MAX_ENUMERATION_IDS ? last : MAX_ENUMERATION_IDS;
-    const positions: LiquidityPosition[] = [];
-    for (let id = 1n; id <= cap; id += 1n) {
-      const position = await positionAt(client, input.lending, id, input.block.number);
-      if (
-        position &&
-        isAddressEqual(position.market, input.market) &&
-        position.aprBps === input.aprBps
-      ) {
-        positions.push(position);
-      }
-    }
-    return {
-      positions,
-      aggregateDepth: positions.reduce((sum, row) => sum + row.availableLiquidity, 0n),
-    };
-  };
 }
 
 async function readStreamEligible(
@@ -568,8 +528,7 @@ async function loadSnapshot(
   client: LiveClient,
   {
     pinnedBlock,
-    loadBorrowProjection,
-  }: Pick<LiveSnapshotOptions, "pinnedBlock" | "loadBorrowProjection"> = {},
+  }: Pick<LiveSnapshotOptions, "pinnedBlock"> = {},
 ): Promise<ActionSnapshot> {
   const block = pinnedBlock ?? await client.getBlock({ blockTag: "latest" });
   if (!block.hash) throw new Error("Action snapshot block has no hash");
@@ -840,7 +799,7 @@ async function loadSnapshot(
       const aprBps = requireNumber(parsed.raw.args?.[1], "APR");
       const target = requireBigint(parsed.raw.args?.[2], "borrow amount");
       const reviewedMin = requireBigint(parsed.raw.args?.[4], "minimum received");
-      const [recipient, approved, approvedForAll, eligible, projection, preview] = await Promise.all([
+      const [recipient, approved, approvedForAll, eligible, preview] = await Promise.all([
         read<Address>(client, blockNumber, {
           address: market.sablier,
           abi: sablierLockupAbi,
@@ -860,14 +819,6 @@ async function loadSnapshot(
           args: [identity.account, lending],
         }),
         readStreamEligible(client, scope, market, streamId, blockNumber),
-        loadBorrowProjection
-          ? loadBorrowProjection({
-              lending,
-              market: scope.market,
-              aprBps,
-              block: { number: block.number, hash: blockHash, timestamp: block.timestamp },
-            })
-          : Promise.resolve({ positions: [] as const, aggregateDepth: 0n }),
         readPreviewBorrow({
           client,
           lending,
@@ -896,13 +847,13 @@ async function loadSnapshot(
           {
             market: scope.market,
             aprBps,
-            candidateIds: projection.positions.map((row) => row.id),
-            aggregateDepth: projection.aggregateDepth,
-            maxRouteIds: projection.positions.length === 0 ? 0 : LIVE_BORROW_MAX_ROUTE_IDS,
+            candidateIds: [],
+            aggregateDepth: 0n,
+            maxRouteIds: 0,
           },
           metadata,
         ),
-        hydration: readyOutcome({ positions: [...projection.positions] }, metadata),
+        hydration: readyOutcome({ positions: [] }, metadata),
         quote: readyOutcome(
           {
             market: scope.market,
@@ -1287,7 +1238,6 @@ export async function createLiveExecutionPlan(
   client: LiveClient,
   options: {
     bootstrap: ReadyProtocolBootstrap;
-    loadBorrowProjection?: LiveBorrowProjectionLoader;
   },
 ): Promise<
   | { status: "ready"; plan: ExecutionPlan }

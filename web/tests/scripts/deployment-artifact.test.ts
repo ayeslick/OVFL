@@ -13,6 +13,7 @@ const OVRFLO = "0x2234567890abcdef1234567890abcdef12345678";
 const LENDING = "0x3234567890abcdef1234567890abcdef12345678";
 const STREAM = "0x4234567890abcdef1234567890abcdef12345678";
 const RESERVE = "0x5234567890abcdef1234567890abcdef12345678";
+const LENS = "0x6234567890abcdef1234567890abcdef12345678";
 const FACTORY_HASH = `0x${"ab".repeat(32)}`;
 const LENDING_HASH = `0x${"cd".repeat(32)}`;
 // keccak256("LendingRegistered(address,address)") — mirrors the constant recomputed in
@@ -24,6 +25,7 @@ const SABLIER_SELECTOR = "0x482879aa";
 const OVRFLO_STREAM_SELECTOR = "0xce6bc9b5";
 const RESERVE_SELECTOR = "0xcd3293de";
 const OVRFLO_TO_RESERVE_SELECTOR = "0x82029b36";
+const LENS_LOCKUP_SELECTOR = "0x06490f47";
 const temporaryDirectories: string[] = [];
 
 function paddedAddress(address: string) {
@@ -50,12 +52,16 @@ function streamAwareRequest(inner: (url: string, method: string, params: unknown
       if (to.toLowerCase() === FACTORY.toLowerCase() && selector.startsWith(OVRFLO_TO_RESERVE_SELECTOR)) {
         return paddedAddress(RESERVE);
       }
+      if (to.toLowerCase() === LENS.toLowerCase() && selector === LENS_LOCKUP_SELECTOR) {
+        return paddedAddress(STREAM);
+      }
       throw new Error(`unexpected eth_call ${to} ${data}`);
     }
     if (method === "eth_getCode") {
       const [address] = params as [string, string];
       if (address.toLowerCase() === STREAM.toLowerCase()) return "0x6000";
       if (address.toLowerCase() === RESERVE.toLowerCase()) return "0x6000";
+      if (address.toLowerCase() === LENS.toLowerCase()) return "0x6000";
     }
     return inner(url, method, params);
   };
@@ -84,6 +90,7 @@ describe("deployment artifact generator", () => {
         freshGeneration: true,
         chainId: 1,
         factory: FACTORY,
+        lens: LENS,
       }),
     );
 
@@ -139,6 +146,7 @@ describe("deployment artifact generator", () => {
       lendingDeploymentBlockHash: LENDING_HASH,
       stream: STREAM,
       reserve: RESERVE,
+      lens: LENS,
     });
   });
 
@@ -283,6 +291,133 @@ describe("deployment artifact generator", () => {
         request,
       }),
     ).rejects.toThrow(/supplied reserve/i);
+  });
+
+  it("rejects a missing lens instead of deriving one from the factory", async () => {
+    const root = await mkdtemp(join(tmpdir(), "ovrflo-deployment-"));
+    temporaryDirectories.push(root);
+    const artifactPath = join(root, "local.json");
+    writeFileSync(
+      artifactPath,
+      JSON.stringify({
+        formatVersion: 1,
+        projectionSchemaVersion: 1,
+        abiVersion: 1,
+        freshGeneration: true,
+        chainId: 1,
+        factory: FACTORY,
+        ovrflo: OVRFLO,
+        lending: LENDING,
+        reserve: RESERVE,
+      }),
+    );
+
+    const request = streamAwareRequest(
+      vi.fn(async (_url: string, method: string, params: unknown[]) => {
+        if (method === "eth_chainId") return "0x1";
+        if (method === "eth_blockNumber") return "0x10";
+        if (method === "eth_getCode") {
+          const [address, block] = params as [string, string];
+          const firstBlock = address.toLowerCase() === FACTORY.toLowerCase() ? 5n : 7n;
+          return BigInt(block) >= firstBlock ? "0x6000" : "0x";
+        }
+        if (method === "eth_getBlockByNumber") {
+          return { hash: BigInt(params[0] as string) === 5n ? FACTORY_HASH : LENDING_HASH };
+        }
+        if (method === "eth_getLogs") {
+          return [
+            {
+              address: FACTORY,
+              blockNumber: "0x9",
+              blockHash: LENDING_HASH,
+              topics: [
+                LENDING_REGISTERED_TOPIC,
+                `0x${OVRFLO.slice(2).padStart(64, "0")}`,
+                `0x${LENDING.slice(2).padStart(64, "0")}`,
+              ],
+            },
+          ];
+        }
+        throw new Error(`unexpected ${method}`);
+      }),
+    );
+
+    await expect(
+      verifyAndWriteDeploymentArtifact({
+        artifactPath,
+        rpcUrl: "https://redacted.example",
+        request,
+      }),
+    ).rejects.toThrow(/lens must be a non-zero Ethereum address/i);
+  });
+
+  it("rejects a supplied lens whose lockup does not match factory.ovrfloStream()", async () => {
+    const root = await mkdtemp(join(tmpdir(), "ovrflo-deployment-"));
+    temporaryDirectories.push(root);
+    const artifactPath = join(root, "local.json");
+    writeFileSync(
+      artifactPath,
+      JSON.stringify({
+        formatVersion: 1,
+        projectionSchemaVersion: 1,
+        abiVersion: 1,
+        freshGeneration: true,
+        chainId: 1,
+        factory: FACTORY,
+        ovrflo: OVRFLO,
+        lending: LENDING,
+        reserve: RESERVE,
+        lens: LENS,
+      }),
+    );
+
+    const request = streamAwareRequest(
+      vi.fn(async (_url: string, method: string, params: unknown[]) => {
+        if (method === "eth_chainId") return "0x1";
+        if (method === "eth_blockNumber") return "0x10";
+        if (method === "eth_getCode") {
+          const [address, block] = params as [string, string];
+          const firstBlock = address.toLowerCase() === FACTORY.toLowerCase() ? 5n : 7n;
+          return BigInt(block) >= firstBlock ? "0x6000" : "0x";
+        }
+        if (method === "eth_getBlockByNumber") {
+          return { hash: BigInt(params[0] as string) === 5n ? FACTORY_HASH : LENDING_HASH };
+        }
+        if (method === "eth_getLogs") {
+          return [
+            {
+              address: FACTORY,
+              blockNumber: "0x9",
+              blockHash: LENDING_HASH,
+              topics: [
+                LENDING_REGISTERED_TOPIC,
+                `0x${OVRFLO.slice(2).padStart(64, "0")}`,
+                `0x${LENDING.slice(2).padStart(64, "0")}`,
+              ],
+            },
+          ];
+        }
+        throw new Error(`unexpected ${method}`);
+      }),
+    );
+
+    const mismatched = async (url: string, method: string, params: unknown[]) => {
+      if (method === "eth_call") {
+        const [{ to, data }] = params as [{ to: string; data: string }];
+        if (to.toLowerCase() === LENS.toLowerCase() && data.toLowerCase() === LENS_LOCKUP_SELECTOR) {
+          return paddedAddress("0x9999999999999999999999999999999999999999");
+        }
+      }
+      return request(url, method, params);
+    };
+
+    await expect(
+      verifyAndWriteDeploymentArtifact({
+        artifactPath,
+        rpcUrl: "https://redacted.example",
+        request: mismatched,
+      }),
+    ).rejects.toThrow(/lens.lockup\(\) does not match factory.ovrfloStream\(\)/i);
   });
 
   it("rejects when the expected LendingRegistered event is missing at the anchored block", async () => {

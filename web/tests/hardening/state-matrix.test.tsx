@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { SurfaceState } from "@/components/kit/SurfaceState";
 import { SURFACE_STATES, SURFACE_STATE_LABEL, type SurfaceStateKind } from "@/lib/surface-state";
 
-const TOPOLOGIES = ["watch", "supply", "borrow", "assets"] as const;
+const TOPOLOGIES = ["watch", "supply", "borrow", "create"] as const;
 
 describe("state matrix — one topology per route", () => {
   it("renders all eight states with distinct labeled UI on each route topology", () => {

@@ -13,7 +13,6 @@
 #
 # Env overrides:
 #   RPC_URL                          — NEXT_PUBLIC_RPC_URL (default: per-profile)
-#   REOWN_PROJECT_ID                 — NEXT_PUBLIC_REOWN_PROJECT_ID
 #   DEPLOYMENTS_JSON                 — path override (default: deployments/<network>.json)
 #   OUT                              — output path override (default: web/.env.<local|devnet>)
 
@@ -53,7 +52,9 @@ if ! jq -e '
   (.lendingDeploymentBlock | tostring | test("^(0|[1-9][0-9]*)$")) and
   (.lendingDeploymentBlockHash | type == "string" and test("^0x[0-9a-fA-F]{64}$")) and
   (.stream | type == "string" and test("^0x[0-9a-fA-F]{40}$")) and
-  (.stream != "0x0000000000000000000000000000000000000000")
+  (.stream != "0x0000000000000000000000000000000000000000") and
+  (.lens | type == "string" and test("^0x[0-9a-fA-F]{40}$")) and
+  (.lens != "0x0000000000000000000000000000000000000000")
 ' "$DEPLOYMENTS_JSON" >/dev/null; then
   echo "write-env: $DEPLOYMENTS_JSON is not a verified fresh-generation v1 artifact." >&2
   echo "write-env: regenerate it with write-deployment-artifact.mjs before building the UI." >&2
@@ -69,6 +70,7 @@ LENDING=$(jq -r '.lending' "$DEPLOYMENTS_JSON")
 LENDING_BLOCK=$(jq -r '.lendingDeploymentBlock' "$DEPLOYMENTS_JSON")
 LENDING_BLOCK_HASH=$(jq -r '.lendingDeploymentBlockHash' "$DEPLOYMENTS_JSON")
 STREAM=$(jq -r '.stream' "$DEPLOYMENTS_JSON")
+LENS=$(jq -r '.lens' "$DEPLOYMENTS_JSON")
 PROJECTION_SCHEMA_VERSION=$(jq -r '.projectionSchemaVersion' "$DEPLOYMENTS_JSON")
 ABI_VERSION=$(jq -r '.abiVersion' "$DEPLOYMENTS_JSON")
 
@@ -96,8 +98,6 @@ esac
 
 RPC_URL="${RPC_URL:-$DEFAULT_RPC}"
 RPC_FALLBACK_URLS="${RPC_FALLBACK_URLS:-${DEFAULT_RPC_FALLBACKS:-}}"
-HISTORICAL_RPC_URL="${HISTORICAL_RPC_URL:-$RPC_URL}"
-REOWN_PROJECT_ID="${REOWN_PROJECT_ID:-}"
 OUT="${OUT:-$OUT_DEFAULT}"
 
 if [ "$NETWORK" = "devnet" ] && [ -z "$RPC_URL" ]; then
@@ -115,6 +115,7 @@ trap 'rm -f "$TMP"' EXIT
   echo "NEXT_PUBLIC_RUNTIME_PROFILE=local"
   echo "NEXT_PUBLIC_CHAIN_ID=$CHAIN_ID"
   echo "NEXT_PUBLIC_OVRFLO_FACTORY=$FACTORY"
+  echo "NEXT_PUBLIC_OVRFLO_LENS=$LENS"
   echo "NEXT_PUBLIC_FACTORY_DEPLOYMENT_BLOCK=$FACTORY_BLOCK"
   echo "NEXT_PUBLIC_FACTORY_DEPLOYMENT_BLOCK_HASH=$FACTORY_BLOCK_HASH"
   echo "NEXT_PUBLIC_PROJECTION_SCHEMA_VERSION=$PROJECTION_SCHEMA_VERSION"
@@ -125,19 +126,10 @@ trap 'rm -f "$TMP"' EXIT
   if [ -n "$RPC_FALLBACK_URLS" ]; then
     echo "NEXT_PUBLIC_RPC_FALLBACK_URLS=$RPC_FALLBACK_URLS"
   fi
-  if [ -n "$HISTORICAL_RPC_URL" ]; then
-    echo "NEXT_PUBLIC_HISTORICAL_RPC_URL=$HISTORICAL_RPC_URL"
-  fi
-  if [ -n "$REOWN_PROJECT_ID" ]; then
-    echo "NEXT_PUBLIC_REOWN_PROJECT_ID=$REOWN_PROJECT_ID"
-  else
-    echo "# NEXT_PUBLIC_REOWN_PROJECT_ID must be set before running the UI."
-    echo "# NEXT_PUBLIC_REOWN_PROJECT_ID="
-  fi
 } > "$TMP"
 
 mv "$TMP" "$OUT"
 trap - EXIT
 
 echo "write-env: wrote $OUT"
-echo "           factory=$FACTORY@$FACTORY_BLOCK  stream=$STREAM  rpc=${RPC_URL:-<unset>}"
+echo "           factory=$FACTORY@$FACTORY_BLOCK  lens=$LENS  stream=$STREAM  rpc=${RPC_URL:-<unset>}"

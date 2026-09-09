@@ -50,7 +50,7 @@ describe("inventory — D first-run, E risk, F acknowledgment", () => {
     }
     expect(document.querySelector('[data-step="get-pt"]')).toHaveTextContent("GET PT");
     expect(screen.getByText("mints the market's ovrflo token")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /I ALREADY HOLD PT/i })).toHaveAttribute("href", "/assets");
+    expect(screen.getByRole("link", { name: /I ALREADY HOLD PT/i })).toHaveAttribute("href", "/create");
     expect(screen.queryByRole("meter")).not.toBeInTheDocument();
     expect(screen.queryByText(/demonstration/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/TVL/i)).not.toBeInTheDocument();

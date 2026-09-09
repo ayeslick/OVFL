@@ -32,20 +32,21 @@ const OBSOLETE_ENV_VARS = [
   "NEXT_PUBLIC_OVRFLO_RESERVE",
   "NEXT_PUBLIC_LENDING_DEPLOYMENT_BLOCK",
   "NEXT_PUBLIC_LENDING_DEPLOYMENT_BLOCK_HASH",
+  "NEXT_PUBLIC_REOWN_PROJECT_ID",
+  "NEXT_PUBLIC_HISTORICAL_RPC_URL",
 ] as const;
 
 const env = {
   profile: process.env.NEXT_PUBLIC_RUNTIME_PROFILE,
   chainId: process.env.NEXT_PUBLIC_CHAIN_ID,
   factory: process.env.NEXT_PUBLIC_OVRFLO_FACTORY,
+  lens: process.env.NEXT_PUBLIC_OVRFLO_LENS,
   factoryDeploymentBlock: process.env.NEXT_PUBLIC_FACTORY_DEPLOYMENT_BLOCK,
   factoryDeploymentBlockHash: process.env.NEXT_PUBLIC_FACTORY_DEPLOYMENT_BLOCK_HASH,
   projectionSchemaVersion: process.env.NEXT_PUBLIC_PROJECTION_SCHEMA_VERSION,
   abiVersion: process.env.NEXT_PUBLIC_ABI_VERSION,
   rpcUrl: process.env.NEXT_PUBLIC_RPC_URL,
   rpcFallbackUrls: process.env.NEXT_PUBLIC_RPC_FALLBACK_URLS,
-  historicalRpcUrl: process.env.NEXT_PUBLIC_HISTORICAL_RPC_URL,
-  reownProjectId: process.env.NEXT_PUBLIC_REOWN_PROJECT_ID,
   vercelEnv: process.env.VERCEL_ENV,
   nodeEnv: process.env.NODE_ENV,
   deployableBuild: process.env.OVRFLO_DEPLOYABLE_BUILD,
@@ -187,20 +188,6 @@ function parseRpcUrls(profile: RuntimeProfile) {
   ];
 }
 
-function parseReownProjectId(profile: RuntimeProfile) {
-  const value =
-    profile === "production"
-      ? required(env.reownProjectId, "NEXT_PUBLIC_REOWN_PROJECT_ID")
-      : (env.reownProjectId || "00000000000000000000000000000000");
-  if (
-    profile === "production" &&
-    (!/^[0-9a-fA-F]{32}$/.test(value) || value === "00000000000000000000000000000000")
-  ) {
-    throw new Error("NEXT_PUBLIC_REOWN_PROJECT_ID must be a non-placeholder 32-character hex id");
-  }
-  return value;
-}
-
 function warnObsoleteEnvVars() {
   if (env.nodeEnv === "production") return;
   for (const name of OBSOLETE_ENV_VARS) {
@@ -219,6 +206,10 @@ export const chainId = parseChainId(env.chainId, runtimeProfile);
 export const factoryAddress = parseRequiredAddress(
   env.factory,
   "NEXT_PUBLIC_OVRFLO_FACTORY",
+);
+export const lensAddress = parseRequiredAddress(
+  env.lens,
+  "NEXT_PUBLIC_OVRFLO_LENS",
 );
 export const factoryDeployment: FactoryDeployment = {
   address: factoryAddress,
@@ -249,14 +240,6 @@ export const rpcUrls = parseRpcUrls(runtimeProfile);
 const primaryRpcUrl = rpcUrls[0];
 if (!primaryRpcUrl) throw new Error("NEXT_PUBLIC_RPC_URL is required");
 export const rpcUrl = primaryRpcUrl;
-export const historicalRpcUrl = parseUrl(
-  runtimeProfile === "production"
-    ? required(env.historicalRpcUrl, "NEXT_PUBLIC_HISTORICAL_RPC_URL")
-    : (env.historicalRpcUrl ?? rpcUrl),
-  "NEXT_PUBLIC_HISTORICAL_RPC_URL",
-  runtimeProfile,
-);
-export const reownProjectId = parseReownProjectId(runtimeProfile);
 
 export function isConfiguredAddress(address: Address | null | undefined) {
   return Boolean(address && address.toLowerCase() !== ZERO_ADDRESS);

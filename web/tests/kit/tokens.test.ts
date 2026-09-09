@@ -51,7 +51,7 @@ describe("CS4-U1 visual tokens", () => {
   it("ships a static-export create page", () => {
     const createPage = readFileSync(join(WEB_ROOT, "app/create/page.tsx"), "utf8");
     expect(createPage).toContain('currentNav="create"');
-    expect(createPage).toContain("DefaultHub");
+    expect(createPage).toContain("StreamCreateFlow");
     expect(createPage).not.toContain("/activity/");
   });
 

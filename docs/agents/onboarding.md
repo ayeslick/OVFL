@@ -83,9 +83,9 @@ The vault stays solvent on the combined check in §5. The deposit adds PT backin
 
 ## 2. Live contract map
 
-This table is live `src/` today after CS1 and CS2 flash mint. Request book (CS3) is a later unit. Do not treat the request book as already in `src/`.
+This table is live `src/` today after CS1, CS2 flash mint, CS3 request book, and the deployed `OVRFLOLens`.
 
-Eight Solidity files in `src/`. Five are DeploySize deployables (factory, vault, reserve, token, lending). Two are libraries (`StreamPricing`, `TickTree`). `OVRFLOStreamLens` is a deployless read lens; it is not a DeploySize deployable.
+Nine Solidity files in `src/`. Seven are DeploySize deployables (factory, vault, reserve, token, lending, request book, lens). Two are libraries (`StreamPricing`, `TickTree`).
 
 | File | Role |
 |---|---|
@@ -94,7 +94,8 @@ Eight Solidity files in `src/`. Five are DeploySize deployables (factory, vault,
 | `OVRFLOReserve.sol` | Wrap reserve. Vault constructs it. It constructs the token. Wrap/unwrap, `wrappedUnderlying`, and ERC-3156 flash mint of ovrfloToken live here. Admin is the factory. Launch `flashMintMax` is 0. |
 | `OVRFLOToken.sol` | ERC20 + Permit. Reserve constructs it. Two named immutable minters: `vault()` and `reserve()`. |
 | `OVRFLOLending.sol` | Loan-only fixed-rate tick book. Escrows ovrfloToken. One current lending per registered vault (`replaceLending` keeps old markets known). Owner is the factory from construction. |
-| `OVRFLOStreamLens.sol` | Deployless read lens. Frontend ships creation bytecode and calls via `eth_call` with no `to`. Not a DeploySize deployable. |
+| `OVRFLORequestBook.sol` | Fill-or-rest request book. Current book is `lending.router()`. Prior books stay in `priorRouterAt`. |
+| `OVRFLOLens.sol` | Deployed read lens. Constructor binds the lockup. Frontend calls `streamsOfOwner` / `streamsOfOwnerIn` via ordinary `eth_call`. Verify `lens.lockup() == factory.ovrfloStream()`. |
 | `StreamPricing.sol` | Pure library: APR factor, gross price, obligation, fee, stream eligibility. |
 | `TickTree.sol` | Packed prefix-sum tree for one tick epoch. Height 4→7. |
 
@@ -379,7 +380,7 @@ Use this table when two sources collide. Re-verify the "Live" column if `src/` m
 | Topic | Stale / mixed claim | Live |
 |---|---|---|
 | Stream layer name | Stale CONCEPTS rebrand / `setMinter` paragraph (rewritten in U7) | Getter `sablierLL` / interface `ISablierV2LockupLinear` bind the OVRFLO Streams fork (`factory.ovrfloStream()`). Canonical `0xAFb979…` is not the bound address. |
-| Stream discovery | Browser log-scan candidates, then on-chain hydrate (`web/lib/discovery/`). Older streams-campaign notes said "ticket 08 — unbuilt." | Enumerable holder lists in `useStreams` (`balanceOf` + `tokensOfOwnerIn`). Log-scan is not live. Denomination ticket 08 is docs sync, not Enumerable. |
+| Stream discovery | Browser log-scan candidates, then on-chain hydrate (`web/lib/discovery/`). Enumerable `balanceOf` + `tokensOfOwnerIn`. | Deployed `OVRFLOLens.streamsOfOwner*` via ordinary `eth_call`. Extra `balanceOf` is gone. Log-scan is not live. |
 | PT flash | `CONCEPTS.md` historical `PT flash loan` entry; discipline doc; old onboarding | Removed in CS1. Vault has no `flashLoan`. ERC-3156 flash mint of ovrfloToken lives on `OVRFLOReserve`. |
 | Factory constructor | Older seed snippets: `(sablier, owner)` | `(owner, oracle)`. Stream address is admitted via `setOvrfloStream`; vault/lending take it as a constructor arg. |
 | Nested deploy | "Vault constructs and owns the token" | Vault constructs `OVRFLOReserve`. Reserve constructs `OVRFLOToken`. Two named minters: `vault()` and `reserve()`. |
@@ -390,7 +391,7 @@ Use this table when two sources collide. Re-verify the "Live" column if `src/` m
 | `ovrfloInfo` | "is the stream" | Three fields: treasury, underlying, ovrfloToken. The stream contract is not in this mapping. After the streams plan, `create*` *reads* `ovrfloInfo(msg.sender)` to prove the caller is a registered vault. |
 | Factory "deploys" lending | Comments still say "deployed by this factory" | External deploy + `registerLending`. |
 | UI visual world | Clearing Ledger | Watch surface / three-bay workbench. Clearing Ledger is a retired name. |
-| Ponder | Off-chain indexer | Deleted. Discovery is Enumerable holder lists. |
+| Ponder | Off-chain indexer | Deleted. Wallet-held streams come from `OVRFLOLens`. |
 | Claim-all | Global CLAIM ALL | Per-position `claim` on the supplied detail. |
 
 ---

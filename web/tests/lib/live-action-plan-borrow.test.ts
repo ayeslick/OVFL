@@ -2,15 +2,10 @@ import { describe, expect, it, vi } from "vitest";
 import type { Address } from "viem";
 import { ZERO_ADDRESS } from "@/lib/config";
 import { WAD } from "@/lib/lending-math";
-import {
-  createLiveActionDraft,
-  type LiveBorrowProjectionLoader,
-} from "@/lib/live-action-plan";
+import { createLiveActionDraft } from "@/lib/live-action-plan";
 import type { ReadyProtocolBootstrap } from "@/lib/protocol-bootstrap";
-import type { LiquidityPosition } from "@/lib/types";
 
 const account = "0x0000000000000000000000000000000000000a11" as Address;
-const other = "0x0000000000000000000000000000000000000b22" as Address;
 const factory = "0x0000000000000000000000000000000000000f00" as Address;
 const vault = "0x0000000000000000000000000000000000000d44" as Address;
 const lending = "0x0000000000000000000000000000000000000b22" as Address;
@@ -33,6 +28,7 @@ const bootstrap: ReadyProtocolBootstrap = {
   status: "ready",
   factory,
   stream,
+  lens: stream,
   blockNumber: 1n,
   vaults: [
     {
@@ -45,6 +41,8 @@ const bootstrap: ReadyProtocolBootstrap = {
       retiredLendings: [],
     },
   ],
+  markets: [],
+  books: [],
 };
 
 const scope = {
@@ -73,21 +71,6 @@ const eligibleStream = {
   isTransferable: true,
   amounts: { deposited: WAD, withdrawn: 0n, refunded: 0n },
 };
-
-const positions: readonly LiquidityPosition[] = [
-  {
-    id: 4n,
-    lender: other,
-    market,
-    aprBps,
-    availableLiquidity: 12n * WAD,
-  },
-];
-
-const loadProjection: LiveBorrowProjectionLoader = async () => ({
-  positions,
-  aggregateDepth: 12n * WAD,
-});
 
 function mockClient(streamRow: typeof eligibleStream) {
   const client = {
@@ -122,8 +105,8 @@ function mockClient(streamRow: typeof eligibleStream) {
   return client;
 }
 
-describe("createLiveActionDraft borrow projection", () => {
-  it("fails routing-incomplete when no projection loader runs", async () => {
+describe("createLiveActionDraft borrow", () => {
+  it("returns a ready draft from previewBorrow without lender reconstruction", async () => {
     const result = await createLiveActionDraft(
       {
         address: lending,
@@ -134,24 +117,6 @@ describe("createLiveActionDraft borrow projection", () => {
       scope,
       mockClient(eligibleStream),
       { bootstrap },
-    );
-    expect(result).toEqual({
-      status: "invalid",
-      errors: [expect.objectContaining({ code: "routing-incomplete" })],
-    });
-  });
-
-  it("returns a ready draft when the projection conserves", async () => {
-    const result = await createLiveActionDraft(
-      {
-        address: lending,
-        functionName: "borrow",
-        args: [market, aprBps, amountWei, streamId, minAcceptable, account],
-      },
-      identity,
-      scope,
-      mockClient(eligibleStream),
-      { bootstrap, loadBorrowProjection: loadProjection },
     );
     expect(result?.status).toBe("ready");
     if (result?.status !== "ready") throw new Error("expected ready borrow draft");
@@ -164,6 +129,11 @@ describe("createLiveActionDraft borrow projection", () => {
       minAcceptable,
       account,
     ]);
+    expect(result.draft.action.review.route).toEqual({
+      ids: [],
+      amounts: [],
+      aprBps,
+    });
   });
 
   it("fails stream-ineligible when getStream is not borrow collateral", async () => {
@@ -176,7 +146,7 @@ describe("createLiveActionDraft borrow projection", () => {
       identity,
       scope,
       mockClient({ ...eligibleStream, isCancelable: true }),
-      { bootstrap, loadBorrowProjection: loadProjection },
+      { bootstrap },
     );
     expect(result).toEqual({
       status: "invalid",

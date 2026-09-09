@@ -50,7 +50,6 @@ function asRound(result: unknown): ChainlinkRound | null {
 export function useUsdPrice(underlying: Address | undefined): ReadOutcome<UsdQuote> {
   const clock = useClock();
   const recipe = underlying ? lookupUsdRecipe(underlying) : null;
-  const share = recipe?.shareRate;
   const reads = useReadContracts({
     allowFailure: true,
     // Mixed aggregator / decimals / share-rate ABIs do not share one wagmi tuple.
@@ -66,32 +65,19 @@ export function useUsdPrice(underlying: Address | undefined): ReadOutcome<UsdQuo
             abi: erc20DecimalsAbi,
             functionName: "decimals",
           },
-          ...(share
-            ? [
-                {
-                  address: share.contract,
-                  abi: [
-                    {
-                      type: "function" as const,
-                      name: share.functionName,
-                      stateMutability: "view" as const,
-                      inputs: [],
-                      outputs: [{ name: "", type: "uint256" }],
-                    },
-                  ],
-                  functionName: share.functionName,
-                },
-              ]
-            : []),
-          ...(recipe.kind === "chainlink-eth-usd-times-eth-rate" && recipe.ethUsdAggregator
-            ? [
-                {
-                  address: recipe.ethUsdAggregator,
-                  abi: chainlinkAggregatorAbi,
-                  functionName: "latestRoundData" as const,
-                },
-              ]
-            : []),
+          {
+            address: recipe.shareRate.contract,
+            abi: [
+              {
+                type: "function" as const,
+                name: recipe.shareRate.functionName,
+                stateMutability: "view" as const,
+                inputs: [],
+                outputs: [{ name: "", type: "uint256" }],
+              },
+            ],
+            functionName: recipe.shareRate.functionName,
+          },
         ]
       : []) as unknown as [],
     query: { ...readQuery, enabled: Boolean(recipe) },
@@ -120,33 +106,11 @@ export function useUsdPrice(underlying: Address | undefined): ReadOutcome<UsdQuo
         readFailure("useUsdPrice", "incomplete", "USD feed round is incomplete"),
       ]);
     }
-    let shareRate: bigint | undefined;
-    let cursor = 2;
-    if (share) {
-      const shareRow = rows[cursor];
-      cursor += 1;
-      if (shareRow?.status !== "success" || typeof shareRow.result !== "bigint") {
-        return unavailableOutcome<UsdQuote>([
-          readFailure("useUsdPrice", "incomplete", "USD share rate is incomplete"),
-        ]);
-      }
-      shareRate = shareRow.result;
-    }
-    let ethUsdRound: ChainlinkRound | undefined;
-    if (recipe.kind === "chainlink-eth-usd-times-eth-rate") {
-      const ethRow = rows[cursor];
-      if (ethRow?.status !== "success") {
-        return unavailableOutcome<UsdQuote>([
-          readFailure("useUsdPrice", "incomplete", "ETH/USD feed is incomplete"),
-        ]);
-      }
-      const parsed = asRound(ethRow.result);
-      if (!parsed) {
-        return unavailableOutcome<UsdQuote>([
-          readFailure("useUsdPrice", "incomplete", "ETH/USD feed is incomplete"),
-        ]);
-      }
-      ethUsdRound = parsed;
+    const shareRow = rows[2];
+    if (!shareRow || shareRow.status !== "success" || typeof shareRow.result !== "bigint") {
+      return unavailableOutcome<UsdQuote>([
+        readFailure("useUsdPrice", "incomplete", "USD share rate is incomplete"),
+      ]);
     }
     const quote = classifyUsd({
       round,
@@ -155,9 +119,8 @@ export function useUsdPrice(underlying: Address | undefined): ReadOutcome<UsdQuo
       grace: USD_HEARTBEAT_GRACE_SECONDS,
       kind: recipe.kind,
       feedDecimals: recipe.feedDecimals,
-      shareRate,
-      ethUsdRound,
+      shareRate: shareRow.result,
     });
     return readyOutcome(quote);
-  }, [clock.adjustedNow, reads.data, reads.error, reads.isLoading, recipe, share]);
+  }, [clock.adjustedNow, reads.data, reads.error, reads.isLoading, recipe]);
 }

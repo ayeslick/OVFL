@@ -5,6 +5,7 @@ import { discoverProtocolBootstrap } from "@/lib/protocol-bootstrap";
 import { ZERO_ADDRESS } from "@/lib/config";
 
 const FACTORY = "0x0000000000000000000000000000000000000f00" as Address;
+const LENS = "0x0000000000000000000000000000000000000e55" as Address;
 const STREAM = "0x0000000000000000000000000000000000000b01" as Address;
 const VAULT_A = "0x0000000000000000000000000000000000000a01" as Address;
 const TREASURY = "0x0000000000000000000000000000000000000701" as Address;
@@ -37,6 +38,7 @@ describe("discoverProtocolBootstrap", () => {
     getChainId: vi.fn(),
     getBlock: vi.fn(),
     multicall: vi.fn(),
+    readContract: vi.fn(),
   };
 
   beforeEach(() => {
@@ -44,14 +46,16 @@ describe("discoverProtocolBootstrap", () => {
     client.getChainId.mockReset();
     client.getBlock.mockReset();
     client.multicall.mockReset();
+    client.readContract.mockReset();
     client.getBytecode.mockResolvedValue("0x6000");
     client.getChainId.mockResolvedValue(1);
     client.getBlock.mockResolvedValue({ number: 10n, hash: BLOCK_HASH });
+    client.readContract.mockResolvedValue(STREAM);
   });
 
   it("is unavailable when the factory has no bytecode", async () => {
     client.getBytecode.mockResolvedValue("0x");
-    const result = await discoverProtocolBootstrap(client, FACTORY, 1);
+    const result = await discoverProtocolBootstrap(client, FACTORY, 1, LENS);
     expect(result).toEqual({
       status: "unavailable",
       failures: [expect.objectContaining({ code: "no_code" })],
@@ -61,7 +65,7 @@ describe("discoverProtocolBootstrap", () => {
 
   it("rejects discovery on the wrong chain id", async () => {
     client.getChainId.mockResolvedValue(31337);
-    const result = await discoverProtocolBootstrap(client, FACTORY, 1);
+    const result = await discoverProtocolBootstrap(client, FACTORY, 1, LENS);
     expect(result).toEqual({
       status: "unavailable",
       failures: [expect.objectContaining({ code: "wrong_chain" })],
@@ -71,7 +75,7 @@ describe("discoverProtocolBootstrap", () => {
 
   it("fails closed when ovrfloStream() is unset", async () => {
     client.multicall.mockResolvedValueOnce([success(ZERO_ADDRESS), success(0n)]);
-    const result = await discoverProtocolBootstrap(client, FACTORY, 1);
+    const result = await discoverProtocolBootstrap(client, FACTORY, 1, LENS);
     expect(result.status).toBe("unavailable");
     if (result.status === "unavailable") {
       expect(result.failures[0]?.code).toBe("rpc_revert");
@@ -81,7 +85,7 @@ describe("discoverProtocolBootstrap", () => {
 
   it("fails closed when ovrfloStream() reverts", async () => {
     client.multicall.mockResolvedValueOnce([failure(), success(0n)]);
-    const result = await discoverProtocolBootstrap(client, FACTORY, 1);
+    const result = await discoverProtocolBootstrap(client, FACTORY, 1, LENS);
     expect(result).toEqual({
       status: "unavailable",
       failures: [expect.objectContaining({ code: "rpc_revert", message: expect.stringMatching(/ovrfloStream/) })],
@@ -92,7 +96,7 @@ describe("discoverProtocolBootstrap", () => {
     client.multicall
       .mockResolvedValueOnce([success(STREAM), success(1n)])
       .mockResolvedValueOnce([failure()]);
-    const result = await discoverProtocolBootstrap(client, FACTORY, 1);
+    const result = await discoverProtocolBootstrap(client, FACTORY, 1, LENS);
     expect(result.status).toBe("unavailable");
     if (result.status === "unavailable") {
       expect(result.failures[0]?.code).toBe("rpc_revert");
@@ -105,7 +109,7 @@ describe("discoverProtocolBootstrap", () => {
       .mockResolvedValueOnce([success(STREAM), success(1n)])
       .mockResolvedValueOnce([success(VAULT_A)])
       .mockResolvedValueOnce([failure(), success(LENDING), success(RESERVE)]);
-    const result = await discoverProtocolBootstrap(client, FACTORY, 1);
+    const result = await discoverProtocolBootstrap(client, FACTORY, 1, LENS);
     expect(result.status).toBe("unavailable");
     if (result.status === "unavailable") {
       expect(result.failures[0]?.message).toMatch(/ovrfloInfo/);
@@ -121,7 +125,7 @@ describe("discoverProtocolBootstrap", () => {
         failure(),
         success(RESERVE),
       ]);
-    const result = await discoverProtocolBootstrap(client, FACTORY, 1);
+    const result = await discoverProtocolBootstrap(client, FACTORY, 1, LENS);
     expect(result.status).toBe("unavailable");
     if (result.status === "unavailable") {
       expect(result.failures[0]?.message).toMatch(/ovrfloToLending/);
@@ -137,7 +141,7 @@ describe("discoverProtocolBootstrap", () => {
         success(LENDING),
         failure(),
       ]);
-    const result = await discoverProtocolBootstrap(client, FACTORY, 1);
+    const result = await discoverProtocolBootstrap(client, FACTORY, 1, LENS);
     expect(result.status).toBe("unavailable");
     if (result.status === "unavailable") {
       expect(result.failures[0]?.message).toMatch(/ovrfloToReserve/);
@@ -154,7 +158,7 @@ describe("discoverProtocolBootstrap", () => {
         success(RESERVE),
       ])
       .mockResolvedValueOnce([failure()]);
-    const result = await discoverProtocolBootstrap(client, FACTORY, 1);
+    const result = await discoverProtocolBootstrap(client, FACTORY, 1, LENS);
     expect(result.status).toBe("unavailable");
     if (result.status === "unavailable") {
       expect(result.failures[0]?.message).toMatch(/lendingCount/);
@@ -170,7 +174,7 @@ describe("discoverProtocolBootstrap", () => {
         success(LENDING),
         success(ZERO_ADDRESS),
       ]);
-    const result = await discoverProtocolBootstrap(client, FACTORY, 1);
+    const result = await discoverProtocolBootstrap(client, FACTORY, 1, LENS);
     expect(result.status).toBe("unavailable");
     if (result.status === "unavailable") {
       expect(result.failures[0]?.message).toMatch(/zero address/);
@@ -179,12 +183,15 @@ describe("discoverProtocolBootstrap", () => {
 
   it("returns ready with an empty vault list when the registry is empty", async () => {
     client.multicall.mockResolvedValueOnce([success(STREAM), success(0n)]);
-    const result = await discoverProtocolBootstrap(client, FACTORY, 1);
+    const result = await discoverProtocolBootstrap(client, FACTORY, 1, LENS);
     expect(result).toEqual({
       status: "ready",
       factory: FACTORY,
       stream: STREAM,
+      lens: LENS,
       vaults: [],
+      markets: [],
+      books: [],
       blockNumber: 10n,
     });
   });
@@ -200,12 +207,16 @@ describe("discoverProtocolBootstrap", () => {
       ])
       .mockResolvedValueOnce([success(1n)])
       .mockResolvedValueOnce([success(LENDING)])
-      .mockResolvedValueOnce([success(VAULT_A)]);
-    const result = await discoverProtocolBootstrap(client, FACTORY, 1);
+      .mockResolvedValueOnce([success(VAULT_A)])
+      .mockResolvedValueOnce([success(0n)])
+      .mockResolvedValueOnce([success(ZERO_ADDRESS)])
+      .mockResolvedValueOnce([success(0n)]);
+    const result = await discoverProtocolBootstrap(client, FACTORY, 1, LENS);
     expect(result).toEqual({
       status: "ready",
       factory: FACTORY,
       stream: STREAM,
+      lens: LENS,
       blockNumber: 10n,
       vaults: [
         {
@@ -216,6 +227,14 @@ describe("discoverProtocolBootstrap", () => {
           reserve: RESERVE,
           lending: LENDING,
           retiredLendings: [],
+        },
+      ],
+      markets: [],
+      books: [
+        {
+          lending: LENDING,
+          currentBook: null,
+          priorBooks: [],
         },
       ],
     });
@@ -230,12 +249,16 @@ describe("discoverProtocolBootstrap", () => {
         success(LENDING),
         success(RESERVE),
       ])
+      .mockResolvedValueOnce([success(0n)])
+      .mockResolvedValueOnce([success(0n)])
+      .mockResolvedValueOnce([success(ZERO_ADDRESS)])
       .mockResolvedValueOnce([success(0n)]);
-    const result = await discoverProtocolBootstrap(client, FACTORY, 1);
+    const result = await discoverProtocolBootstrap(client, FACTORY, 1, LENS);
     expect(result.status).toBe("ready");
     if (result.status === "ready") {
       expect(result.vaults[0]?.retiredLendings).toEqual([]);
       expect(result.vaults[0]?.reserve).toBe(RESERVE);
+      expect(result.lens).toBe(LENS);
     }
   });
 
@@ -250,8 +273,11 @@ describe("discoverProtocolBootstrap", () => {
       ])
       .mockResolvedValueOnce([success(2n)])
       .mockResolvedValueOnce([success(OLD_LENDING), success(LENDING)])
-      .mockResolvedValueOnce([success(VAULT_A), success(VAULT_A)]);
-    const result = await discoverProtocolBootstrap(client, FACTORY, 1);
+      .mockResolvedValueOnce([success(VAULT_A), success(VAULT_A)])
+      .mockResolvedValueOnce([success(0n)])
+      .mockResolvedValueOnce([success(ZERO_ADDRESS), success(ZERO_ADDRESS)])
+      .mockResolvedValueOnce([success(0n), success(0n)]);
+    const result = await discoverProtocolBootstrap(client, FACTORY, 1, LENS);
     expect(result.status).toBe("ready");
     if (result.status === "ready") {
       expect(result.vaults[0]?.lending).toBe(LENDING);

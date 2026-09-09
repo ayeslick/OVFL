@@ -1,6 +1,5 @@
 import { isAddressEqual } from "viem";
 import { isFreshReady, type ReadOutcome } from "../read-outcome";
-import { selectHydratedRoute } from "../router";
 import {
   actionError,
   invalidAction,
@@ -75,55 +74,6 @@ export const borrowDefinition: ActionDefinition<"borrow"> = {
         actionError("snapshot-resource-mismatch", "Route state does not match the selected market"),
       );
     }
-    const candidateIds = routing.candidateIds;
-    if (
-      candidateIds.length === 0 ||
-      new Set(candidateIds).size !== candidateIds.length ||
-      candidateIds.some((id) => id <= 0n)
-    ) {
-      return invalidAction(
-        actionError("routing-incomplete", "Projected route identifiers are incomplete"),
-      );
-    }
-    const positionsById = new Map(snapshot.hydration.data.positions.map((position) => [position.id, position]));
-    if (
-      positionsById.size !== snapshot.hydration.data.positions.length ||
-      candidateIds.some((id) => !positionsById.has(id))
-    ) {
-      return invalidAction(
-        actionError("routing-incomplete", "A projected route candidate lacks fresh hydration"),
-      );
-    }
-    const projectedPositions = candidateIds.map((id) => positionsById.get(id)!);
-    if (
-      projectedPositions.some(
-        (position) =>
-          !isAddressEqual(position.market, snapshot.market.market) ||
-          position.aprBps !== routing.aprBps ||
-          position.availableLiquidity < 0n,
-      )
-    ) {
-      return invalidAction(
-        actionError("routing-incomplete", "Hydrated route data does not match the projected tick"),
-      );
-    }
-
-    const selected = selectHydratedRoute({
-      positions: projectedPositions,
-      target: parsed.amount,
-      aggregateDepth: routing.aggregateDepth,
-      maxRouteIds: routing.maxRouteIds,
-    });
-    if (selected.status === "conservation-failed") {
-      return invalidAction(
-        actionError("routing-incomplete", "Projected and hydrated route depth do not conserve"),
-      );
-    }
-    if (selected.status !== "ready") {
-      return invalidAction(
-        actionError("routing-insufficient", "Fresh public liquidity cannot fill this amount"),
-      );
-    }
 
     const quote = snapshot.quote.data;
     if (
@@ -147,9 +97,6 @@ export const borrowDefinition: ActionDefinition<"borrow"> = {
     ) {
       return invalidAction(actionError("quote-invalid", "Fresh borrow quote is invalid"));
     }
-    const selectedAmounts = selected.selectedIds.map(
-      (id) => positionsById.get(id)!.availableLiquidity,
-    );
     const authorizations = [
       {
         kind: "erc721" as const,
@@ -179,18 +126,10 @@ export const borrowDefinition: ActionDefinition<"borrow"> = {
       type: intent.type,
       identity: snapshot.identity,
       title: "BORROW",
-      preconditions: [
-        "fresh-stream",
-        "fresh-projected-route",
-        "fresh-hydration",
-        "fresh-quote",
-        "single-block",
-        "route-conserved",
-      ],
+      preconditions: ["fresh-stream", "fresh-quote", "single-block"],
       authorizations,
       call,
       touchedResources: [
-        ...selected.selectedIds.map((id) => ({ kind: "liquidity-position" as const, lending, id })),
         { kind: "market-depth", lending, market: snapshot.market.market, aprBps: routing.aprBps },
         { kind: "stream", sablier: snapshot.market.sablier, id: intent.streamId },
         {
@@ -202,8 +141,8 @@ export const borrowDefinition: ActionDefinition<"borrow"> = {
         },
       ],
       route: {
-        ids: selected.selectedIds,
-        amounts: selectedAmounts,
+        ids: [],
+        amounts: [],
         aprBps: routing.aprBps,
       },
       economics: {
@@ -213,14 +152,14 @@ export const borrowDefinition: ActionDefinition<"borrow"> = {
         obligation: quote.obligation,
         residual: quote.residual,
         minAcceptable: quote.minAcceptable,
-        selectedDepth: selected.selectedDepth,
+        selectedDepth: quote.actualBorrow,
         aprBps: routing.aprBps,
       },
       receiptSummary: {
         source: lending,
         eventName: "Borrowed",
         label: "BORROWED",
-        expectedIds: [intent.streamId, ...selected.selectedIds],
+        expectedIds: [intent.streamId],
         expectedAmounts: {
           borrowed: parsed.amount,
           minimumReceived: quote.minAcceptable,

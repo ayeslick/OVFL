@@ -93,7 +93,7 @@ describe("SelectStream", () => {
   it("renders the guided handoff when there is no eligible stream", () => {
     render(<NoStream />);
     expect(screen.getByText("Borrow needs a stream")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "CREATE A STREAM" })).toHaveAttribute("href", "/assets");
+    expect(screen.getByRole("link", { name: "CREATE A STREAM" })).toHaveAttribute("href", "/create");
     expect(screen.getByRole("link", { name: "GUIDED FIRST RUN" })).toHaveAttribute("href", "/");
     expect(screen.queryByLabelText("BORROW AMOUNT")).not.toBeInTheDocument();
   });

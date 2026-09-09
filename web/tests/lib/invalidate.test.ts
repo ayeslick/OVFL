@@ -18,13 +18,14 @@ describe("invalidateAllOnChainReads", () => {
     const queryClient = new QueryClient();
     const spy = vi.spyOn(queryClient, "invalidateQueries");
     invalidateAllOnChainReads(queryClient, user);
-    expect(spy).toHaveBeenCalledTimes(6);
+    expect(spy).toHaveBeenCalledTimes(7);
     expect(spy).toHaveBeenCalledWith({ queryKey: ["readContract"] });
     expect(spy).toHaveBeenCalledWith({ queryKey: ["readContracts"] });
     expect(spy).toHaveBeenCalledWith({ queryKey: ["protocolBootstrap"] });
     expect(spy).toHaveBeenCalledWith({ queryKey: ["stream-book"] });
     expect(spy).toHaveBeenCalledWith({ queryKey: ["lender-book"] });
     expect(spy).toHaveBeenCalledWith({ queryKey: ["borrower-book"] });
+    expect(spy).toHaveBeenCalledWith({ queryKey: ["request-book"] });
   });
 });
 

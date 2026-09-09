@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { encodeFunctionData, type Address } from "viem";
+import { ConverterFlow } from "@/components/assets/ConverterFlow";
 import { ActionButton } from "@/components/kit/ActionButton";
 import { AmountField } from "@/components/kit/AmountField";
 import { Receipt } from "@/components/kit/Receipt";
@@ -15,7 +16,7 @@ import { formatCoverDate, formatTruncatedDecimal } from "@/lib/format";
 import { MAX_UINT128 } from "@/lib/lending-math";
 import { parseDecimalInput } from "@/lib/parse";
 import { coverDate, type StreamSchedule } from "@/lib/payoff";
-import { readRepayHandoff, writeRepayHandoff } from "@/lib/storage";
+import { readRepayHandoff } from "@/lib/storage";
 import type { MarketInfo } from "@/lib/types";
 import { userFacingError } from "@/lib/errors";
 import "./watch-write-exits.css";
@@ -224,15 +225,17 @@ export function WatchWrite({
             Wallet holds {formatTruncatedDecimal(wrapShortfall.have, 18, 5)} {symbol}. Wrapping{" "}
             {formatTruncatedDecimal(wrapShortfall.need, 18, 5)} {underlyingSymbol} covers the rest.
           </p>
-          <div className="kit-action-wrap">
-            <a
-              className="kit-action"
-              href={`/assets/?return=repay&loan=${loanId?.toString() ?? ""}`}
-              onClick={() => loanId !== undefined && writeRepayHandoff(loanId, repayRaw)}
-            >
-              WRAP SHORTFALL
-            </a>
-          </div>
+          <ConverterFlow
+            market={market}
+            underlyingSymbol={underlyingSymbol}
+            ovrfloSymbol={symbol}
+            repayHref={
+              loanId !== undefined
+                ? `/?lending=${lending}&loan=${loanId.toString()}`
+                : undefined
+            }
+            signingAllowed={!stale}
+          />
         </div>
       ) : null}
       {kind === "repay" && !flow.isConfirmed && needsApprove ? (
@@ -264,6 +267,7 @@ export function WatchWrite({
       {flow.hash ? <p className="watch-hero-meta">{truncateHash(flow.hash)}</p> : null}
       {kind === "claim" && flow.isConfirmed ? (
         <ClaimConfirmedExits
+          market={market}
           symbol={symbol}
           underlyingSymbol={underlyingSymbol}
           payout={claimedPayout}
@@ -311,6 +315,7 @@ export function WatchWrite({
 }
 
 function ClaimConfirmedExits({
+  market,
   symbol,
   underlyingSymbol,
   payout,
@@ -320,6 +325,10 @@ function ClaimConfirmedExits({
   ptBacked,
   onKeep,
 }: {
+  market: Pick<
+    MarketInfo,
+    "vault" | "reserve" | "lending" | "market" | "underlying" | "ovrfloToken" | "ptToken" | "expiryCached"
+  >;
   symbol: string;
   underlyingSymbol: string;
   payout: bigint | null;
@@ -351,20 +360,19 @@ function ClaimConfirmedExits({
         . Unwrap and claim PT are separate exits.
       </p>
       <ActionButton variant="primary" onClick={onKeep}>{`KEEP ${symbol}`}</ActionButton>
-      {unwrapEnabled ? (
-        <div className="kit-action-wrap" data-named-state="unwrap-available">
-          <a className="kit-action" href="/assets/">
-            UNWRAP TO UNDERLYING
-          </a>
+      {unwrapEnabled || (matured && ptBacked) ? (
+        <div className="kit-action-wrap" data-named-state={unwrapEnabled ? "unwrap-available" : "pt-claim-available"}>
+          <ConverterFlow
+            market={market}
+            underlyingSymbol={underlyingSymbol}
+            ovrfloSymbol={symbol}
+            signingAllowed
+          />
         </div>
       ) : (
         <p className="watch-note">{`RESERVE ${reserveLabel} ${underlyingSymbol} — UNWRAP STAYS CLOSED`}</p>
       )}
-      {matured && ptBacked ? (
-        <p className="watch-note" data-named-state="pt-claim-available">
-          Claim PT is available on Assets after series maturity.
-        </p>
-      ) : (
+      {matured && ptBacked ? null : (
         <p className="watch-note">Claim PT opens at series maturity when PT backing is present.</p>
       )}
     </div>

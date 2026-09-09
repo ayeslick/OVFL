@@ -37,7 +37,7 @@ vi.mock("@/lib/protocol/lending", async (importOriginal) => {
   return { ...actual, loadFactoryLenderPage, loadFactoryBorrowerPage };
 });
 
-function wrapper({ children }: { children: ReactNode }) {
+function Wrapper({ children }: { children: ReactNode }) {
   const [client] = useState(
     () =>
       new QueryClient({
@@ -56,7 +56,7 @@ describe("book hooks", () => {
   });
 
   it("lender book at zero entities is confirmed-empty, not unavailable", async () => {
-    const { result } = renderHook(() => useLenderBook(LENDING, USER), { wrapper });
+    const { result } = renderHook(() => useLenderBook(LENDING, USER), { wrapper: Wrapper });
     await waitFor(() => {
       expect(result.current.status).toBe("ready");
     });
@@ -67,7 +67,7 @@ describe("book hooks", () => {
   });
 
   it("borrower book at zero entities is confirmed-empty, not unavailable", async () => {
-    const { result } = renderHook(() => useBorrowerBook(LENDING, USER), { wrapper });
+    const { result } = renderHook(() => useBorrowerBook(LENDING, USER), { wrapper: Wrapper });
     await waitFor(() => {
       expect(result.current.status).toBe("ready");
     });
@@ -77,7 +77,7 @@ describe("book hooks", () => {
   });
 
   it("stamps TanStack dataUpdatedAt on a ready borrower book", async () => {
-    const { result } = renderHook(() => useBorrowerBook(LENDING, USER), { wrapper });
+    const { result } = renderHook(() => useBorrowerBook(LENDING, USER), { wrapper: Wrapper });
     await waitFor(() => {
       expect(result.current.status).toBe("ready");
     });
@@ -85,7 +85,7 @@ describe("book hooks", () => {
   });
 
   it("stamps TanStack dataUpdatedAt on a ready lender book", async () => {
-    const { result } = renderHook(() => useLenderBook(LENDING, USER), { wrapper });
+    const { result } = renderHook(() => useLenderBook(LENDING, USER), { wrapper: Wrapper });
     await waitFor(() => {
       expect(result.current.status).toBe("ready");
     });
@@ -94,7 +94,7 @@ describe("book hooks", () => {
 
   it("lender book classifies a failed count as unavailable, never zero (AE1)", async () => {
     loadFactoryLenderPage.mockRejectedValue(new Error("rpc down"));
-    const { result } = renderHook(() => useLenderBook(LENDING, USER), { wrapper });
+    const { result } = renderHook(() => useLenderBook(LENDING, USER), { wrapper: Wrapper });
     await waitFor(
       () => {
         expect(result.current.status).toBe("unavailable");
@@ -110,7 +110,7 @@ describe("book hooks", () => {
         readFailure("loadLenderPage", "subcall", "positionState reverted"),
       ]),
     );
-    const { result } = renderHook(() => useLenderBook(LENDING, USER), { wrapper });
+    const { result } = renderHook(() => useLenderBook(LENDING, USER), { wrapper: Wrapper });
     await waitFor(() => {
       expect(result.current.status).toBe("partial");
     });
@@ -126,7 +126,7 @@ describe("book hooks", () => {
         readFailure("loadBorrowerPage", "subcall", "loanState reverted"),
       ]),
     );
-    const { result } = renderHook(() => useBorrowerBook(LENDING, USER), { wrapper });
+    const { result } = renderHook(() => useBorrowerBook(LENDING, USER), { wrapper: Wrapper });
     await waitFor(() => {
       expect(result.current.status).toBe("partial");
     });
@@ -137,7 +137,7 @@ describe("book hooks", () => {
   });
 
   it("does not treat an empty lending list as a first-run zero while markets load", () => {
-    const { result } = renderHook(() => useLenderBook([], USER, { enabled: false }), { wrapper });
+    const { result } = renderHook(() => useLenderBook([], USER, { enabled: false }), { wrapper: Wrapper });
     expect(result.current.status).toBe("loading");
   });
 });
@@ -161,7 +161,7 @@ describe("useLadder", () => {
       isLoading: false,
       error: null,
     };
-    const { result } = renderHook(() => useLadder(LENDING, MARKET), { wrapper });
+    const { result } = renderHook(() => useLadder(LENDING, MARKET), { wrapper: Wrapper });
     expect(result.current.status).toBe("ready");
     if (result.current.status !== "ready") throw new Error("expected ready");
     expect(result.current.data.model.rungs).toHaveLength(1);

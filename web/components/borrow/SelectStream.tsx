@@ -70,7 +70,7 @@ export function NoStream() {
         from Assets, or start from the guided path if this wallet has no stream yet.
       </p>
       <p>
-        <a href="/assets">CREATE A STREAM</a>
+        <a href="/create">CREATE A STREAM</a>
         {" · "}
         <a href="/">GUIDED FIRST RUN</a>
       </p>

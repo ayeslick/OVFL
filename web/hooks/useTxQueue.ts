@@ -8,9 +8,9 @@ import type {
 import type { ActionIdentity } from "@/lib/actions/types";
 import {
   reconcileQueuedTx,
-  type ClaimAllRowReconciliation,
+  type QueuedTxReconciliation,
   type QueuedTx,
-} from "@/lib/claim-all";
+} from "@/lib/queued-tx";
 import type { EconomicIdentity, GraphSemanticId } from "@/lib/action-graph";
 import { decodeDepositedStreamId } from "@/lib/deposit-output";
 import {
@@ -57,11 +57,11 @@ export type QueueOutcome =
   | "complete_with_skips"
   | "partial_completion";
 
-export type ClaimAllRowBuild =
+export type QueuedTxBuild =
   | { status: "ready"; plan: ExecutionPlan }
-  | Extract<ClaimAllRowReconciliation, { status: "needs-review" | "skipped" }>;
+  | Extract<QueuedTxReconciliation, { status: "needs-review" | "skipped" }>;
 
-export type ClaimAllQueueExecutor = {
+export type QueuedTxExecutor = {
   confirm: (
     plan: ExecutionPlan,
     persist?: PersistPendingContext,
@@ -81,8 +81,8 @@ export type UseTxQueueOptions = {
   rebuild: (
     tx: QueuedTx,
     identity: ActionIdentity,
-  ) => Promise<ClaimAllRowBuild>;
-  executor: ClaimAllQueueExecutor;
+  ) => Promise<QueuedTxBuild>;
+  executor: QueuedTxExecutor;
   graph?: GraphQueueContext;
 };
 
@@ -295,7 +295,7 @@ export function useTxQueue(options: UseTxQueueOptions) {
       }
 
       updateRow(index, "preparing");
-      let rebuilt: ClaimAllRowBuild;
+      let rebuilt: QueuedTxBuild;
       try {
         rebuilt = await optionsRef.current.rebuild(row.tx, identity);
       } catch (nextError) {

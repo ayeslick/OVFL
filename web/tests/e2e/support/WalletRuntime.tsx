@@ -13,10 +13,8 @@ import { CopyValue } from "@/components/CopyValue";
 // ever reachable from a deliberately-started E2E dev server — never from
 // `npm run build`.
 //
-// It must not import @/lib/wagmi: that module constructs Reown's WagmiAdapter
-// at module scope, which performs WalletConnect setup a sandboxed or offline
-// runner cannot always complete (KTD6). That is the whole reason this seam
-// exists, so the boundary is the point rather than an implementation detail.
+// It must not import @/lib/wagmi in a way that constructs wallet-kit at
+// module scope in a sandboxed runner. The mock connector talks to Anvil.
 
 // Anvil's well-known account #1 — one of ten dev-mnemonic addresses Anvil
 // derives and unlocks internally on every local fork. It is never funded on any

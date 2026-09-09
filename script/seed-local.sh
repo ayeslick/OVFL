@@ -10,9 +10,9 @@
 # whose code paths are not regressed.
 #
 # HTD Deploy sequence: Factory → comptroller → descriptor → lockup →
-# setOvrfloStream → vault → registerOvrflo → wiring reads → binding reads →
-# lending → registerLending → oracle/market/spacing → request book →
-# setLendingRouter → write artifact. Fork
+# setOvrfloStream → OVRFLOLens → vault → registerOvrflo → wiring reads →
+# binding reads → lending → registerLending → oracle/market/spacing →
+# request book → setLendingRouter → write artifact. Fork
 # contracts use `cast send --create` from committed artifacts. After each
 # deploy, read named getters and fail on mismatch (SC23).
 #
@@ -28,11 +28,12 @@
 # docs/plans/2026-08-11-001-fix-factory-mainnet-code-size-registry-plan.md
 # (the 2026-08-10 ticket-08 seed-smoke finding that flag used to work around).
 #
-# Which two Pendle wstETH markets get seeded is discovered live on every run
+# Which Pendle wstETH markets get seeded is discovered live on every run
 # (see lib/discover-pendle-market.sh), not hardcoded — this script forks the
 # *live* chain head (no --fork-block-number pin), so a hardcoded market
-# would eventually expire relative to real wall-clock time. Contrast with
-# test/fork/*.t.sol, which pin a fixed historical block via
+# would eventually expire relative to real wall-clock time. One qualifying
+# market is enough. A second market is onboarded when discovery returns two.
+# Contrast with test/fork/*.t.sol, which pin a fixed historical block via
 # script/lib/OVRFLOTestFixtures.sol and are refreshed only occasionally via
 # script/repin-fork-fixtures.sh.
 #
@@ -107,8 +108,8 @@ echo "seed-local: discovering live wstETH Pendle markets (expiry > now + ${PENDL
 CUTOFF=$((BLOCK_TIMESTAMP + PENDLE_EXPIRY_BUFFER_DAYS * 24 * 60 * 60))
 DISCOVERED=$(pendle_fetch_all_markets | pendle_discover_top2_markets "$WSTETH" "$CUTOFF")
 DISCOVERED_COUNT=$(echo "$DISCOVERED" | grep -c . || true)
-if [ "$DISCOVERED_COUNT" -lt 2 ]; then
-  echo "seed-local: found only $DISCOVERED_COUNT wstETH Pendle market(s) with expiry > now + ${PENDLE_EXPIRY_BUFFER_DAYS}d (need 2)" >&2
+if [ "$DISCOVERED_COUNT" -lt 1 ]; then
+  echo "seed-local: found no wstETH Pendle market with expiry > now + ${PENDLE_EXPIRY_BUFFER_DAYS}d (need 1)" >&2
   echo "seed-local: check connectivity to api-v2.pendle.finance, or lower PENDLE_EXPIRY_BUFFER_DAYS if the live pool is thin right now" >&2
   exit 1
 fi
@@ -118,11 +119,18 @@ SECONDARY_LINE=$(echo "$DISCOVERED" | sed -n '2p')
 PRIMARY_MARKET=$(cast to-check-sum-address "$(echo "$PRIMARY_LINE" | cut -f1)")
 PRIMARY_PT=$(cast to-check-sum-address "$(echo "$PRIMARY_LINE" | cut -f2)")
 PRIMARY_EXPIRY=$(echo "$PRIMARY_LINE" | cut -f3)
-SECONDARY_MARKET=$(cast to-check-sum-address "$(echo "$SECONDARY_LINE" | cut -f1)")
-SECONDARY_PT=$(cast to-check-sum-address "$(echo "$SECONDARY_LINE" | cut -f2)")
-SECONDARY_EXPIRY=$(echo "$SECONDARY_LINE" | cut -f3)
+SECONDARY_MARKET=""
+SECONDARY_PT=""
+SECONDARY_EXPIRY=""
 echo "      primary   = $PRIMARY_MARKET (pt $PRIMARY_PT, expires $PRIMARY_EXPIRY)"
-echo "      secondary = $SECONDARY_MARKET (pt $SECONDARY_PT, expires $SECONDARY_EXPIRY)"
+if [ -n "$SECONDARY_LINE" ]; then
+  SECONDARY_MARKET=$(cast to-check-sum-address "$(echo "$SECONDARY_LINE" | cut -f1)")
+  SECONDARY_PT=$(cast to-check-sum-address "$(echo "$SECONDARY_LINE" | cut -f2)")
+  SECONDARY_EXPIRY=$(echo "$SECONDARY_LINE" | cut -f3)
+  echo "      secondary = $SECONDARY_MARKET (pt $SECONDARY_PT, expires $SECONDARY_EXPIRY)"
+else
+  echo "      secondary = none (one live wstETH market)"
+fi
 
 mkdir -p "$REPO_ROOT/deployments"
 
@@ -248,6 +256,17 @@ send "$FACTORY" 'setOvrfloStream(address)' "$SABLIER"
 require_eq "$(call_addr "$FACTORY" 'ovrfloStream()(address)')" "$SABLIER" "factory.ovrfloStream mismatch"
 echo "      factory.ovrfloStream = $SABLIER"
 
+echo "[5b/14] deploy OVRFLOLens (immutable lockup)"
+LENS_JSON=$(
+  forge create \
+    --rpc-url "$RPC" --private-key "$OWNER_PK" --broadcast --legacy --json \
+    src/OVRFLOLens.sol:OVRFLOLens \
+    --constructor-args "$SABLIER"
+)
+LENS=$(echo "$LENS_JSON" | jq -r '.deployedTo')
+require_eq "$(call_addr "$LENS" 'lockup()(address)')" "$SABLIER" "lens.lockup mismatch"
+echo "      lens    = $LENS"
+
 echo "[6/14] deploy OVRFLO vault (factory admin, stream last)"
 OVRFLO_JSON=$(
   forge create \
@@ -316,12 +335,14 @@ require_eq "$REGISTERED_LENDING" "$LENDING" "factory.ovrfloToLending mismatch af
 echo "[12/14] prepareOracle, addMarket, setLendingTickSpacing"
 send "$FACTORY" 'prepareOracle(address,uint32)' \
   "$PRIMARY_MARKET" "$TWAP"
-send "$FACTORY" 'prepareOracle(address,uint32)' \
-  "$SECONDARY_MARKET" "$TWAP"
 send "$FACTORY" 'addMarket(address,address,uint32,uint16)' \
   "$OVRFLO" "$PRIMARY_MARKET" "$TWAP" 25
-send "$FACTORY" 'addMarket(address,address,uint32,uint16)' \
-  "$OVRFLO" "$SECONDARY_MARKET" "$TWAP" 10
+if [ -n "$SECONDARY_MARKET" ]; then
+  send "$FACTORY" 'prepareOracle(address,uint32)' \
+    "$SECONDARY_MARKET" "$TWAP"
+  send "$FACTORY" 'addMarket(address,address,uint32,uint16)' \
+    "$OVRFLO" "$SECONDARY_MARKET" "$TWAP" 10
+fi
 # Onboarding-checklist spacing sanity (U5 security review, plan risk table): the
 # tick ladder view (`tickDepths`) is O(rungs), and spacing is set-once per market —
 # a pathological small spacing (e.g. 1) permanently blows up the ladder's rung
@@ -332,8 +353,10 @@ send "$FACTORY" 'addMarket(address,address,uint32,uint16)' \
 # sets spacing, is cheaper than re-deriving the bound at every future market.
 send "$FACTORY" 'setLendingTickSpacing(address,address,uint16)' \
   "$LENDING" "$PRIMARY_MARKET" "$LENDING_TICK_SPACING"
-send "$FACTORY" 'setLendingTickSpacing(address,address,uint16)' \
-  "$LENDING" "$SECONDARY_MARKET" "$LENDING_TICK_SPACING"
+if [ -n "$SECONDARY_MARKET" ]; then
+  send "$FACTORY" 'setLendingTickSpacing(address,address,uint16)' \
+    "$LENDING" "$SECONDARY_MARKET" "$LENDING_TICK_SPACING"
+fi
 
 echo "[13/14] deploy OVRFLORequestBook and setLendingRouter"
 BOOK_JSON=$(
@@ -353,13 +376,15 @@ echo "      requestBook = $BOOK"
 echo "      seed dev + lender wallets with PT + wstETH"
 # Pendle PT inherits OZ ERC20, so balances live in mapping at slot 0.
 AMOUNT_HEX=$(cast to-uint256 "$PT_SEED_AMOUNT")
+PTS=("$PRIMARY_PT")
+if [ -n "$SECONDARY_PT" ]; then
+  PTS+=("$SECONDARY_PT")
+fi
 for WALLET in "$DEV_WALLET" "$LENDER_WALLET"; do
   PT_SLOT=$(cast index address "$WALLET" 0)
-  cast rpc --rpc-url "$RPC" anvil_setStorageAt \
-    "$PRIMARY_PT" "$PT_SLOT" "$AMOUNT_HEX" >/dev/null
-  cast rpc --rpc-url "$RPC" anvil_setStorageAt \
-    "$SECONDARY_PT" "$PT_SLOT" "$AMOUNT_HEX" >/dev/null
-  for PT in "$PRIMARY_PT" "$SECONDARY_PT"; do
+  for PT in "${PTS[@]}"; do
+    cast rpc --rpc-url "$RPC" anvil_setStorageAt \
+      "$PT" "$PT_SLOT" "$AMOUNT_HEX" >/dev/null
     BAL=$(cast call --rpc-url "$RPC" "$PT" 'balanceOf(address)(uint256)' "$WALLET" \
       | awk '{print $1}')
     if [ "$BAL" != "$PT_SEED_AMOUNT" ]; then
@@ -443,21 +468,21 @@ echo "[14/14] write deployments/local.json"
 # Do not write an unverified stream field. write-deployment-artifact.mjs
 # derives it from the vault and cross-checks lending (SC24). Artifact `reserve`
 # joins the ovrflo/lending paired-optional consume rule.
-jq -n \
+# Omit secondary* when discovery returns one market. E2E readers fall back
+# to the primary series in that case.
+ARTIFACT_JSON=$(jq -n \
   --arg factory   "$FACTORY" \
   --arg ovrflo    "$OVRFLO" \
   --arg token     "$TOKEN" \
   --arg reserve   "$RESERVE" \
   --arg lending   "$LENDING" \
   --arg requestBook "$BOOK" \
+  --arg lens "$LENS" \
   --arg devWallet "$DEV_WALLET" \
   --arg lenderWallet "$LENDER_WALLET" \
   --arg primaryMarket "$PRIMARY_MARKET" \
   --arg primaryPt "$PRIMARY_PT" \
   --argjson primaryExpiry "$PRIMARY_EXPIRY" \
-  --arg secondaryMarket "$SECONDARY_MARKET" \
-  --arg secondaryPt "$SECONDARY_PT" \
-  --argjson secondaryExpiry "$SECONDARY_EXPIRY" \
   --argjson forkBlock "$FORK_BLOCK" \
   --arg forkBlockHash "$FORK_BLOCK_HASH" \
   --arg factoryTransactionHash "$FACTORY_TX" \
@@ -477,17 +502,26 @@ jq -n \
     reserve: $reserve,
     lending: $lending,
     requestBook: $requestBook,
+    lens: $lens,
     lendingTransactionHash: $lendingTransactionHash,
     devWallet: $devWallet,
     lenderWallet: $lenderWallet,
     primaryMarket: $primaryMarket,
     primaryPt: $primaryPt,
-    primaryExpiry: $primaryExpiry,
-    secondaryMarket: $secondaryMarket,
-    secondaryPt: $secondaryPt,
-    secondaryExpiry: $secondaryExpiry
-  }' \
-  > "$REPO_ROOT/deployments/local.json"
+    primaryExpiry: $primaryExpiry
+  }')
+if [ -n "$SECONDARY_MARKET" ]; then
+  ARTIFACT_JSON=$(echo "$ARTIFACT_JSON" | jq \
+    --arg secondaryMarket "$SECONDARY_MARKET" \
+    --arg secondaryPt "$SECONDARY_PT" \
+    --argjson secondaryExpiry "$SECONDARY_EXPIRY" \
+    '. + {
+      secondaryMarket: $secondaryMarket,
+      secondaryPt: $secondaryPt,
+      secondaryExpiry: $secondaryExpiry
+    }')
+fi
+echo "$ARTIFACT_JSON" > "$REPO_ROOT/deployments/local.json"
 
 DEPLOYMENT_RPC_URL="$RPC" node "$REPO_ROOT/tools/scripts/write-deployment-artifact.mjs" \
   "$REPO_ROOT/deployments/local.json"
@@ -503,6 +537,7 @@ echo "token:     $TOKEN"
 echo "reserve:   $RESERVE"
 echo "lending:   $LENDING"
 echo "requestBook: $BOOK"
+echo "lens:      $LENS"
 echo "stream:    $SABLIER"
 echo "devWallet: $DEV_WALLET"
 echo "lender:    $LENDER_WALLET"

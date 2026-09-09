@@ -21,7 +21,7 @@ describe("static-export error boundaries", () => {
     );
     expect(markup).toMatch(/^<html/);
     expect(markup).toContain("<body");
-    expect(markup).toContain("RELOAD APPLICATION");
+    expect(markup).toContain("TRY AGAIN");
   });
 
   it("renders an explicit route loading state without browser discovery", () => {

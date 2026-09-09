@@ -2,7 +2,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { usePublicClient } from "wagmi";
-import { chainId, factoryAddress } from "@/lib/config";
+import { chainId, factoryAddress, lensAddress } from "@/lib/config";
 import {
   discoverProtocolBootstrap,
   type ProtocolBootstrap,
@@ -20,7 +20,7 @@ export function useProtocolBootstrap(): ProtocolBootstrap {
           failures: [{ code: "rpc_revert", message: "Public client is unavailable" }],
         };
       }
-      return discoverProtocolBootstrap(publicClient, factoryAddress, chainId);
+      return discoverProtocolBootstrap(publicClient, factoryAddress, chainId, lensAddress);
     },
     enabled: Boolean(publicClient),
     refetchInterval: READ_INTERVAL_MS,

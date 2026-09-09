@@ -128,7 +128,7 @@ describe("loadRequestBookPage", () => {
 
 describe("loadFactoryRequestBookPage", () => {
   it("pages a prior book when the current router is zero", async () => {
-    const client = bookClient(async ({ address, functionName, args }) => {
+    const client = bookClient(async ({ functionName, args }) => {
       if (functionName === "router") return ZERO;
       if (functionName === "priorRouterCount") return 1n;
       if (functionName === "priorRouterAt") {

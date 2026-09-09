@@ -65,9 +65,9 @@ type Deployment = {
   primaryMarket: Address;
   primaryPt: Address;
   primaryExpiry: number;
-  secondaryMarket: Address;
-  secondaryPt: Address;
-  secondaryExpiry: number;
+  secondaryMarket?: Address;
+  secondaryPt?: Address;
+  secondaryExpiry?: number;
   factoryDeploymentBlock: string;
   requestBook?: Address;
 };
@@ -80,11 +80,12 @@ let cachedDeployment: Deployment | null = null;
 // "address is undefined" from whichever arrange helper reads it first.
 //
 // This is also where PRIMARY_MARKET/SECONDARY_MARKET (below) ultimately come
-// from: seed-local.sh discovers a live wstETH Pendle market on every run
+// from: seed-local.sh discovers live wstETH Pendle markets on every run
 // (see script/lib/discover-pendle-market.sh) rather than hardcoding one that
 // would eventually expire, so this file is the single place that knows
-// which two markets got seeded — no separate TS constants to keep in
-// lockstep with the shell script by hand.
+// which markets got seeded — no separate TS constants to keep in
+// lockstep with the shell script by hand. One market is enough. A second
+// series is optional.
 export function readDeployment(): Deployment {
   if (cachedDeployment) return cachedDeployment;
   const jsonPath = process.env.E2E_DEPLOYMENT_JSON ?? path.resolve(process.cwd(), "..", "deployments", "local.json");
@@ -109,13 +110,16 @@ export function readDeployment(): Deployment {
 // the first real arrange call, which is where this project wants that error
 // surfaced (see readDeployment's own comment).
 export function readSecondaryMarket(): Address {
-  return readDeployment().secondaryMarket;
+  const deployment = readDeployment();
+  return deployment.secondaryMarket ?? deployment.primaryMarket;
 }
 export function readSecondaryPt(): Address {
-  return readDeployment().secondaryPt;
+  const deployment = readDeployment();
+  return deployment.secondaryPt ?? deployment.primaryPt;
 }
 export function readSecondaryExpiry(): bigint {
-  return BigInt(readDeployment().secondaryExpiry);
+  const deployment = readDeployment();
+  return BigInt(deployment.secondaryExpiry ?? deployment.primaryExpiry);
 }
 
 export function readStreamLockup(): Address {

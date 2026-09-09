@@ -1,8 +1,8 @@
 import { type Address, type PublicClient } from "viem";
-import { ovrfloFactoryAbi } from "./abis";
-import { ZERO_ADDRESS } from "./config";
+import { ovrfloAbi, ovrfloFactoryAbi, ovrfloLendingAbi, ovrfloLensAbi } from "./abis";
+import { isConfiguredAddress, ZERO_ADDRESS } from "./config";
 import { MAX_VAULT_REGISTRY_ENTRIES } from "./discovery/limits";
-import type { VaultInfo } from "./types";
+import type { MarketInfo, VaultInfo } from "./types";
 
 export type BootstrapFailureCode =
   | "no_code"
@@ -16,13 +16,23 @@ export type BootstrapFailure = {
   message: string;
 };
 
+export type LendingBookRecord = {
+  lending: Address;
+  /** Current `lending.router()`. Null when the book is unset. */
+  currentBook: Address | null;
+  priorBooks: readonly Address[];
+};
+
 export type ProtocolBootstrap =
   | { status: "loading" }
   | {
       status: "ready";
       factory: Address;
       stream: Address;
+      lens: Address;
       vaults: readonly VaultInfo[];
+      markets: readonly MarketInfo[];
+      books: readonly LendingBookRecord[];
       blockNumber: bigint;
     }
   | { status: "unavailable"; failures: readonly BootstrapFailure[] };
@@ -31,7 +41,7 @@ export type ReadyProtocolBootstrap = Extract<ProtocolBootstrap, { status: "ready
 
 export type BootstrapClient = Pick<
   PublicClient,
-  "getBytecode" | "getChainId" | "getBlock" | "multicall"
+  "getBytecode" | "getChainId" | "getBlock" | "multicall" | "readContract"
 >;
 
 function failure(code: BootstrapFailureCode, message: string): BootstrapFailure {
@@ -55,6 +65,7 @@ export async function discoverProtocolBootstrap(
   client: BootstrapClient,
   factory: Address,
   expectedChainId: number,
+  lens: Address,
 ): Promise<Exclude<ProtocolBootstrap, { status: "loading" }>> {
   let bytecode: Hexish;
   let rpcChainId: number;
@@ -144,11 +155,23 @@ export async function discoverProtocolBootstrap(
     );
   }
 
+  const lensCheck = await verifyDeployedLens(client, lens, stream, blockNumber);
+  if (lensCheck.status === "unavailable") return lensCheck;
+
   const n = Number(count);
   if (n === 0) {
     const skew = await assertBlockStable(client, blockNumber, blockHash);
     if (skew) return skew;
-    return { status: "ready", factory, stream, vaults: [], blockNumber };
+    return {
+      status: "ready",
+      factory,
+      stream,
+      lens,
+      vaults: [],
+      markets: [],
+      books: [],
+      blockNumber,
+    };
   }
 
   let vaultAddressResults: readonly MulticallItem[];
@@ -274,10 +297,69 @@ export async function discoverProtocolBootstrap(
   );
   if (retired.status === "unavailable") return retired;
 
+  const series = await attachApprovedSeries(client, factory, blockNumber, retired.vaults);
+  if (series.status === "unavailable") return series;
+
+  const books = await attachLendingBooks(client, factory, blockNumber, retired.vaults);
+  if (books.status === "unavailable") return books;
+
   const skew = await assertBlockStable(client, blockNumber, blockHash);
   if (skew) return skew;
 
-  return { status: "ready", factory, stream, vaults: retired.vaults, blockNumber };
+  return {
+    status: "ready",
+    factory,
+    stream,
+    lens,
+    vaults: retired.vaults,
+    markets: series.markets,
+    books: books.books,
+    blockNumber,
+  };
+}
+
+async function verifyDeployedLens(
+  client: BootstrapClient,
+  lens: Address,
+  stream: Address,
+  blockNumber: bigint,
+): Promise<{ status: "ready" } | Extract<ProtocolBootstrap, { status: "unavailable" }>> {
+  if (!isConfiguredAddress(lens)) {
+    return unavailable(failure("no_code", "Configured lens is the zero address"));
+  }
+  let bytecode: Hexish;
+  try {
+    bytecode = await client.getBytecode({ address: lens });
+  } catch (error) {
+    return unavailable(
+      failure("rpc_revert", error instanceof Error ? error.message : "Lens bytecode read failed"),
+    );
+  }
+  if (!bytecode || bytecode === "0x") {
+    return unavailable(failure("no_code", "Lens has no bytecode at the configured address"));
+  }
+  let lockup: Address;
+  try {
+    lockup = await client.readContract({
+      address: lens,
+      abi: ovrfloLensAbi,
+      functionName: "lockup",
+      blockNumber,
+    });
+  } catch (error) {
+    return unavailable(
+      failure("rpc_revert", error instanceof Error ? error.message : "lens.lockup() failed"),
+    );
+  }
+  if (lockup.toLowerCase() !== stream.toLowerCase()) {
+    return unavailable(
+      failure(
+        "rpc_revert",
+        `lens.lockup() ${lockup} does not match factory.ovrfloStream() ${stream}`,
+      ),
+    );
+  }
+  return { status: "ready" };
 }
 
 async function attachRetiredLendings(
@@ -429,6 +511,347 @@ async function attachRetiredLendings(
       retiredLendings: retiredLists[index]!,
     })),
   };
+}
+
+async function attachApprovedSeries(
+  client: BootstrapClient,
+  factory: Address,
+  blockNumber: bigint,
+  vaults: readonly VaultInfo[],
+): Promise<
+  | { status: "ready"; markets: MarketInfo[] }
+  | Extract<ProtocolBootstrap, { status: "unavailable" }>
+> {
+  if (vaults.length === 0) {
+    return { status: "ready", markets: [] };
+  }
+
+  let countResults: readonly MulticallItem[];
+  try {
+    countResults = await client.multicall({
+      allowFailure: true,
+      blockNumber,
+      contracts: vaults.map((vault) => ({
+        address: factory,
+        abi: ovrfloFactoryAbi,
+        functionName: "approvedMarketCount" as const,
+        args: [vault.vault] as const,
+      })),
+    });
+  } catch (error) {
+    return unavailable(
+      failure(
+        "rpc_revert",
+        error instanceof Error ? error.message : "approvedMarketCount multicall failed",
+      ),
+    );
+  }
+
+  if (countResults.length !== vaults.length) {
+    return unavailable(failure("rpc_revert", "approvedMarketCount multicall length mismatch"));
+  }
+
+  const counts: bigint[] = [];
+  let total = 0n;
+  for (let index = 0; index < vaults.length; index++) {
+    const item = countResults[index];
+    if (!item || item.status !== "success") {
+      return unavailable(
+        failure("rpc_revert", `approvedMarketCount reverted for vault index ${index}`),
+      );
+    }
+    const count = item.result as bigint;
+    if (count > BigInt(MAX_VAULT_REGISTRY_ENTRIES)) {
+      return unavailable(
+        failure(
+          "budget_exceeded",
+          `approvedMarketCount ${count.toString()} exceeds registry budget ${MAX_VAULT_REGISTRY_ENTRIES}`,
+        ),
+      );
+    }
+    total += count;
+    counts.push(count);
+  }
+  if (total > BigInt(MAX_VAULT_REGISTRY_ENTRIES)) {
+    return unavailable(
+      failure(
+        "budget_exceeded",
+        `approved market total ${total.toString()} exceeds registry budget ${MAX_VAULT_REGISTRY_ENTRIES}`,
+      ),
+    );
+  }
+
+  if (total === 0n) {
+    return { status: "ready", markets: [] };
+  }
+
+  let marketAddressResults: readonly MulticallItem[];
+  try {
+    marketAddressResults = await client.multicall({
+      allowFailure: true,
+      blockNumber,
+      contracts: vaults.flatMap((vault, vaultIndex) => {
+        const count = Number(counts[vaultIndex]!);
+        return Array.from({ length: count }, (_, index) => ({
+          address: factory,
+          abi: ovrfloFactoryAbi,
+          functionName: "approvedMarketAt" as const,
+          args: [vault.vault, BigInt(index)] as const,
+        }));
+      }),
+    });
+  } catch (error) {
+    return unavailable(
+      failure(
+        "rpc_revert",
+        error instanceof Error ? error.message : "approvedMarketAt multicall failed",
+      ),
+    );
+  }
+
+  const expected = Number(total);
+  if (marketAddressResults.length !== expected) {
+    return unavailable(failure("rpc_revert", "approvedMarketAt multicall length mismatch"));
+  }
+
+  const slots: { vault: VaultInfo; market: Address }[] = [];
+  let readIndex = 0;
+  for (let vaultIndex = 0; vaultIndex < vaults.length; vaultIndex++) {
+    const vault = vaults[vaultIndex]!;
+    const count = Number(counts[vaultIndex]!);
+    for (let offset = 0; offset < count; offset++) {
+      const item = marketAddressResults[readIndex++];
+      if (!item || item.status !== "success") {
+        return unavailable(
+          failure("rpc_revert", `approvedMarketAt reverted for vault index ${vaultIndex}`),
+        );
+      }
+      const market = item.result as Address;
+      if (isZero(market)) {
+        return unavailable(
+          failure("rpc_revert", `approvedMarketAt returned the zero address for vault index ${vaultIndex}`),
+        );
+      }
+      slots.push({ vault, market });
+    }
+  }
+
+  let seriesResults: readonly MulticallItem[];
+  try {
+    seriesResults = await client.multicall({
+      allowFailure: true,
+      blockNumber,
+      contracts: slots.map((slot) => ({
+        address: slot.vault.vault,
+        abi: ovrfloAbi,
+        functionName: "series" as const,
+        args: [slot.market] as const,
+      })),
+    });
+  } catch (error) {
+    return unavailable(
+      failure("rpc_revert", error instanceof Error ? error.message : "series multicall failed"),
+    );
+  }
+
+  if (seriesResults.length !== slots.length) {
+    return unavailable(failure("rpc_revert", "series multicall length mismatch"));
+  }
+
+  const markets: MarketInfo[] = [];
+  for (let index = 0; index < slots.length; index++) {
+    const item = seriesResults[index];
+    if (!item || item.status !== "success") {
+      return unavailable(failure("rpc_revert", `series reverted for market index ${index}`));
+    }
+    const tuple = item.result as readonly [
+      number,
+      number,
+      bigint,
+      Address,
+      Address,
+      Address,
+      Address,
+    ];
+    const ptToken = tuple[3];
+    if (isZero(ptToken)) continue;
+    const vault = slots[index]!.vault;
+    markets.push({
+      ...vault,
+      market: slots[index]!.market,
+      twapDurationFixed: tuple[0],
+      feeBps: tuple[1],
+      expiryCached: tuple[2],
+      ptToken,
+      ovrfloToken: tuple[4],
+      underlying: tuple[5],
+      oracle: tuple[6],
+    });
+  }
+  return { status: "ready", markets };
+}
+
+function uniqueLendings(vaults: readonly VaultInfo[]): Address[] {
+  const seen = new Set<string>();
+  const lendings: Address[] = [];
+  for (const vault of vaults) {
+    const candidates = [
+      ...(vault.lending ? [vault.lending] : []),
+      ...vault.retiredLendings,
+    ];
+    for (const lending of candidates) {
+      const key = lending.toLowerCase();
+      if (seen.has(key) || isZero(lending)) continue;
+      seen.add(key);
+      lendings.push(lending);
+    }
+  }
+  return lendings;
+}
+
+async function attachLendingBooks(
+  client: BootstrapClient,
+  factory: Address,
+  blockNumber: bigint,
+  vaults: readonly VaultInfo[],
+): Promise<
+  | { status: "ready"; books: LendingBookRecord[] }
+  | Extract<ProtocolBootstrap, { status: "unavailable" }>
+> {
+  const lendings = uniqueLendings(vaults);
+  if (lendings.length === 0) {
+    return { status: "ready", books: [] };
+  }
+
+  let routerResults: readonly MulticallItem[];
+  try {
+    routerResults = await client.multicall({
+      allowFailure: true,
+      blockNumber,
+      contracts: lendings.map((lending) => ({
+        address: lending,
+        abi: ovrfloLendingAbi,
+        functionName: "router" as const,
+      })),
+    });
+  } catch (error) {
+    return unavailable(
+      failure("rpc_revert", error instanceof Error ? error.message : "lending.router multicall failed"),
+    );
+  }
+
+  if (routerResults.length !== lendings.length) {
+    return unavailable(failure("rpc_revert", "lending.router multicall length mismatch"));
+  }
+
+  let priorCountResults: readonly MulticallItem[];
+  try {
+    priorCountResults = await client.multicall({
+      allowFailure: true,
+      blockNumber,
+      contracts: lendings.map((lending) => ({
+        address: factory,
+        abi: ovrfloFactoryAbi,
+        functionName: "priorRouterCount" as const,
+        args: [lending] as const,
+      })),
+    });
+  } catch (error) {
+    return unavailable(
+      failure(
+        "rpc_revert",
+        error instanceof Error ? error.message : "priorRouterCount multicall failed",
+      ),
+    );
+  }
+
+  if (priorCountResults.length !== lendings.length) {
+    return unavailable(failure("rpc_revert", "priorRouterCount multicall length mismatch"));
+  }
+
+  const priorCounts: bigint[] = [];
+  let priorTotal = 0n;
+  for (let index = 0; index < lendings.length; index++) {
+    const item = priorCountResults[index];
+    if (!item || item.status !== "success") {
+      return unavailable(
+        failure("rpc_revert", `priorRouterCount reverted for lending index ${index}`),
+      );
+    }
+    const count = item.result as bigint;
+    if (count > BigInt(MAX_VAULT_REGISTRY_ENTRIES)) {
+      return unavailable(
+        failure(
+          "budget_exceeded",
+          `priorRouterCount ${count.toString()} exceeds registry budget ${MAX_VAULT_REGISTRY_ENTRIES}`,
+        ),
+      );
+    }
+    priorCounts.push(count);
+    priorTotal += count;
+  }
+
+  let priorAddressResults: readonly MulticallItem[] = [];
+  if (priorTotal > 0n) {
+    try {
+      priorAddressResults = await client.multicall({
+        allowFailure: true,
+        blockNumber,
+        contracts: lendings.flatMap((lending, lendingIndex) => {
+          const count = Number(priorCounts[lendingIndex]!);
+          return Array.from({ length: count }, (_, index) => ({
+            address: factory,
+            abi: ovrfloFactoryAbi,
+            functionName: "priorRouterAt" as const,
+            args: [lending, BigInt(index)] as const,
+          }));
+        }),
+      });
+    } catch (error) {
+      return unavailable(
+        failure(
+          "rpc_revert",
+          error instanceof Error ? error.message : "priorRouterAt multicall failed",
+        ),
+      );
+    }
+    if (priorAddressResults.length !== Number(priorTotal)) {
+      return unavailable(failure("rpc_revert", "priorRouterAt multicall length mismatch"));
+    }
+  }
+
+  const books: LendingBookRecord[] = [];
+  let priorIndex = 0;
+  for (let index = 0; index < lendings.length; index++) {
+    const routerItem = routerResults[index];
+    if (!routerItem || routerItem.status !== "success") {
+      return unavailable(failure("rpc_revert", `lending.router reverted for lending index ${index}`));
+    }
+    const router = routerItem.result as Address;
+    const prior: Address[] = [];
+    const priorCount = Number(priorCounts[index]!);
+    for (let offset = 0; offset < priorCount; offset++) {
+      const priorItem = priorAddressResults[priorIndex++];
+      if (!priorItem || priorItem.status !== "success") {
+        return unavailable(
+          failure("rpc_revert", `priorRouterAt reverted for lending index ${index}`),
+        );
+      }
+      const book = priorItem.result as Address;
+      if (isZero(book)) {
+        return unavailable(
+          failure("rpc_revert", `priorRouterAt returned the zero address for lending index ${index}`),
+        );
+      }
+      prior.push(book);
+    }
+    books.push({
+      lending: lendings[index]!,
+      currentBook: isZero(router) ? null : router,
+      priorBooks: prior,
+    });
+  }
+  return { status: "ready", books };
 }
 
 async function assertBlockStable(

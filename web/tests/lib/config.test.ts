@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const REAL_ADDRESS = "0x1234567890abcdef1234567890abcdef12345678" as const;
+const LENS_ADDRESS = "0xabcdefabcdefabcdefabcdefabcdefabcdefabcd" as const;
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000" as const;
 const BLOCK_HASH = `0x${"ab".repeat(32)}` as const;
 
@@ -13,6 +14,7 @@ const ENV_KEYS = [
   "NEXT_PUBLIC_RUNTIME_PROFILE",
   "NEXT_PUBLIC_CHAIN_ID",
   "NEXT_PUBLIC_OVRFLO_FACTORY",
+  "NEXT_PUBLIC_OVRFLO_LENS",
   "NEXT_PUBLIC_FACTORY_DEPLOYMENT_BLOCK",
   "NEXT_PUBLIC_FACTORY_DEPLOYMENT_BLOCK_HASH",
   "NEXT_PUBLIC_OVRFLO_ADDRESS",
@@ -25,8 +27,6 @@ const ENV_KEYS = [
   "NEXT_PUBLIC_ABI_VERSION",
   "NEXT_PUBLIC_RPC_URL",
   "NEXT_PUBLIC_RPC_FALLBACK_URLS",
-  "NEXT_PUBLIC_HISTORICAL_RPC_URL",
-  "NEXT_PUBLIC_REOWN_PROJECT_ID",
   "VERCEL_ENV",
   "OVRFLO_DEPLOYABLE_BUILD",
   "NODE_ENV",
@@ -43,6 +43,7 @@ function stubValidProduction() {
   vi.stubEnv("NEXT_PUBLIC_RUNTIME_PROFILE", "production");
   vi.stubEnv("NEXT_PUBLIC_CHAIN_ID", "1");
   vi.stubEnv("NEXT_PUBLIC_OVRFLO_FACTORY", REAL_ADDRESS);
+  vi.stubEnv("NEXT_PUBLIC_OVRFLO_LENS", LENS_ADDRESS);
   vi.stubEnv("NEXT_PUBLIC_FACTORY_DEPLOYMENT_BLOCK", "123456");
   vi.stubEnv("NEXT_PUBLIC_FACTORY_DEPLOYMENT_BLOCK_HASH", BLOCK_HASH);
   vi.stubEnv("NEXT_PUBLIC_PROJECTION_SCHEMA_VERSION", "1");
@@ -52,14 +53,13 @@ function stubValidProduction() {
     "NEXT_PUBLIC_RPC_FALLBACK_URLS",
     "https://rpc.example.com,https://rpc-backup.example.com",
   );
-  vi.stubEnv("NEXT_PUBLIC_HISTORICAL_RPC_URL", "https://history.example.com");
-  vi.stubEnv("NEXT_PUBLIC_REOWN_PROJECT_ID", "1234567890abcdef1234567890abcdef");
 }
 
 describe("isConfiguredAddress", () => {
   it("is false for null, undefined, and the zero address; true otherwise", async () => {
     vi.stubEnv("NEXT_PUBLIC_RUNTIME_PROFILE", "local");
     vi.stubEnv("NEXT_PUBLIC_OVRFLO_FACTORY", REAL_ADDRESS);
+    vi.stubEnv("NEXT_PUBLIC_OVRFLO_LENS", LENS_ADDRESS);
     const mod = await loadConfig();
     expect(mod.isConfiguredAddress(null)).toBe(false);
     expect(mod.isConfiguredAddress(undefined)).toBe(false);
@@ -121,12 +121,39 @@ describe("factory address parsing", () => {
     stubValidProduction();
     const mod = await loadConfig();
     expect(mod.factoryAddress).toBe(REAL_ADDRESS);
+    expect(mod.lensAddress).toBe(LENS_ADDRESS);
   });
 
   it("throws on a malformed address instead of silently deploying against garbage", async () => {
     stubValidProduction();
     vi.stubEnv("NEXT_PUBLIC_OVRFLO_FACTORY", "not-an-address");
     await expect(loadConfig()).rejects.toThrow(/must be a valid address/);
+  });
+});
+
+describe("lens address parsing", () => {
+  it("rejects a missing production lens", async () => {
+    stubValidProduction();
+    vi.stubEnv("NEXT_PUBLIC_OVRFLO_LENS", undefined);
+    await expect(loadConfig()).rejects.toThrow(/NEXT_PUBLIC_OVRFLO_LENS.*required/i);
+  });
+
+  it("rejects a missing local lens instead of degrading to the zero address", async () => {
+    vi.stubEnv("NEXT_PUBLIC_RUNTIME_PROFILE", "local");
+    vi.stubEnv("NEXT_PUBLIC_OVRFLO_FACTORY", REAL_ADDRESS);
+    vi.stubEnv("NEXT_PUBLIC_OVRFLO_LENS", undefined);
+    await expect(loadConfig()).rejects.toThrow(/NEXT_PUBLIC_OVRFLO_LENS.*required/i);
+  });
+
+  it("rejects a zero lens in both profiles", async () => {
+    stubValidProduction();
+    vi.stubEnv("NEXT_PUBLIC_OVRFLO_LENS", ZERO_ADDRESS);
+    await expect(loadConfig()).rejects.toThrow(/must not be the zero address/i);
+
+    vi.stubEnv("NEXT_PUBLIC_RUNTIME_PROFILE", "local");
+    vi.stubEnv("NEXT_PUBLIC_OVRFLO_FACTORY", REAL_ADDRESS);
+    vi.stubEnv("NEXT_PUBLIC_OVRFLO_LENS", ZERO_ADDRESS);
+    await expect(loadConfig()).rejects.toThrow(/must not be the zero address/i);
   });
 });
 
@@ -158,7 +185,7 @@ describe("deployment anchor parsing", () => {
 });
 
 describe("RPC configuration", () => {
-  it("keeps the primary and fallbacks in operator order and a separate historical transport", async () => {
+  it("keeps the primary and fallbacks in operator order", async () => {
     stubValidProduction();
     const mod = await loadConfig();
     expect(mod.rpcUrls).toEqual([
@@ -166,7 +193,6 @@ describe("RPC configuration", () => {
       "https://rpc.example.com/",
       "https://rpc-backup.example.com/",
     ]);
-    expect(mod.historicalRpcUrl).toBe("https://history.example.com/");
   });
 
   it("rejects missing production RPC configuration instead of adding a public fallback", async () => {
@@ -195,23 +221,6 @@ describe("RPC configuration", () => {
     vi.stubEnv("NEXT_PUBLIC_RPC_URL", "http://127.0.0.1:8545");
     await expect(loadConfig()).rejects.toThrow(/production.*localhost|local.*production/i);
   });
-});
-
-describe("reownProjectId", () => {
-  it("rejects a missing production project id", async () => {
-    stubValidProduction();
-    vi.stubEnv("NEXT_PUBLIC_REOWN_PROJECT_ID", undefined);
-    await expect(loadConfig()).rejects.toThrow(/NEXT_PUBLIC_REOWN_PROJECT_ID.*required/i);
-  });
-
-  it.each(["", "00000000000000000000000000000000", "not-a-project-id"])(
-    "rejects invalid production project id %j",
-    async (projectId) => {
-      stubValidProduction();
-      vi.stubEnv("NEXT_PUBLIC_REOWN_PROJECT_ID", projectId);
-      await expect(loadConfig()).rejects.toThrow(/NEXT_PUBLIC_REOWN_PROJECT_ID/i);
-    },
-  );
 });
 
 describe("obsolete derived address env vars", () => {
@@ -251,15 +260,18 @@ describe("local-only profile", () => {
   it("requires an explicit factory and keeps mainnet chain id", async () => {
     vi.stubEnv("NEXT_PUBLIC_RUNTIME_PROFILE", "local");
     vi.stubEnv("NEXT_PUBLIC_OVRFLO_FACTORY", REAL_ADDRESS);
+    vi.stubEnv("NEXT_PUBLIC_OVRFLO_LENS", LENS_ADDRESS);
     const mod = await loadConfig();
     expect(mod.chainId).toBe(1);
     expect(mod.factoryAddress).toBe(REAL_ADDRESS);
+    expect(mod.lensAddress).toBe(LENS_ADDRESS);
     expect(mod.rpcUrls).toEqual(["http://127.0.0.1:8545/"]);
   });
 
   it("cannot activate on a Vercel production deployment", async () => {
     vi.stubEnv("NEXT_PUBLIC_RUNTIME_PROFILE", "local");
     vi.stubEnv("NEXT_PUBLIC_OVRFLO_FACTORY", REAL_ADDRESS);
+    vi.stubEnv("NEXT_PUBLIC_OVRFLO_LENS", LENS_ADDRESS);
     vi.stubEnv("VERCEL_ENV", "production");
     await expect(loadConfig()).rejects.toThrow(/local.*production/i);
   });
@@ -267,6 +279,7 @@ describe("local-only profile", () => {
   it("cannot activate when OVRFLO_DEPLOYABLE_BUILD is set", async () => {
     vi.stubEnv("NEXT_PUBLIC_RUNTIME_PROFILE", "local");
     vi.stubEnv("NEXT_PUBLIC_OVRFLO_FACTORY", REAL_ADDRESS);
+    vi.stubEnv("NEXT_PUBLIC_OVRFLO_LENS", LENS_ADDRESS);
     vi.stubEnv("OVRFLO_DEPLOYABLE_BUILD", "1");
     await expect(loadConfig()).rejects.toThrow(/local.*production/i);
   });

@@ -32,7 +32,7 @@ describe("FirstRun container", () => {
     render(<FirstRun />);
     expect(screen.getByText(TEACHING_SENTENCES[0])).toBeInTheDocument();
     expect(screen.getByText("mints the market's ovrflo token")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /I ALREADY HOLD PT/i })).toHaveAttribute("href", "/assets");
+    expect(screen.getByRole("link", { name: /I ALREADY HOLD PT/i })).toHaveAttribute("href", "/create");
     expect(screen.queryByRole("meter")).not.toBeInTheDocument();
     expect(screen.queryByRole("timer")).not.toBeInTheDocument();
     expect(document.querySelector('[data-control="UI-FIRST-RUN-INTENT-BORROW"]')).toHaveAttribute(

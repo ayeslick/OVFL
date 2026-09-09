@@ -20,7 +20,6 @@ function productionEnvironment() {
     NEXT_PUBLIC_RUNTIME_PROFILE: "production",
     NEXT_PUBLIC_RPC_URL: "https://eth-mainnet.g.alchemy.com/v2/public-key",
     NEXT_PUBLIC_RPC_FALLBACK_URLS: "https://fallback.example.com",
-    NEXT_PUBLIC_HISTORICAL_RPC_URL: "https://history.example.com",
   };
 }
 
@@ -30,7 +29,6 @@ describe("CSP generation", () => {
     const csp = headers.find(({ key }: { key: string }) => key === "Content-Security-Policy")?.value;
     expect(csp).toContain("https://eth-mainnet.g.alchemy.com");
     expect(csp).toContain("https://fallback.example.com");
-    expect(csp).toContain("https://history.example.com");
     expect(csp).toContain("https://api-v2.pendle.finance");
     expect(csp).not.toContain("ponder");
     expect(csp).not.toMatch(/localhost|127\.0\.0\.1/);
@@ -40,7 +38,7 @@ describe("CSP generation", () => {
     expect(() =>
       buildSecurityHeaders({
         ...productionEnvironment(),
-        NEXT_PUBLIC_HISTORICAL_RPC_URL: "http://127.0.0.1:8545",
+        NEXT_PUBLIC_RPC_URL: "http://127.0.0.1:8545",
       }),
     ).toThrow(/production/i);
   });
@@ -65,6 +63,7 @@ describe("deployment build input", () => {
     lendingDeploymentBlock: "105",
     lendingDeploymentBlockHash: `0x${"cd".repeat(32)}`,
     stream: "0x4234567890abcdef1234567890abcdef12345678",
+    lens: "0x6234567890abcdef1234567890abcdef12345678",
     projectionSchemaVersion: 1,
     abiVersion: 1,
   };
@@ -73,6 +72,7 @@ describe("deployment build input", () => {
     OVRFLO_DEPLOYMENT_ARTIFACT: "../deployments/production.json",
     DEPLOYMENT_RPC_URL: "https://redacted.example",
     NEXT_PUBLIC_OVRFLO_FACTORY: verified.factory,
+    NEXT_PUBLIC_OVRFLO_LENS: verified.lens,
     NEXT_PUBLIC_FACTORY_DEPLOYMENT_BLOCK: verified.factoryDeploymentBlock,
     NEXT_PUBLIC_FACTORY_DEPLOYMENT_BLOCK_HASH: verified.factoryDeploymentBlockHash,
     NEXT_PUBLIC_PROJECTION_SCHEMA_VERSION: "1",

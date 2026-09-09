@@ -7,7 +7,7 @@ import type {
   ExecutionPlan,
 } from "@/lib/action-runtime";
 import type { ActionIdentity, ReadyAction } from "@/lib/actions/types";
-import type { QueuedTx } from "@/lib/claim-all";
+import type { QueuedTx } from "@/lib/queued-tx";
 import {
   readPendingHash,
   readStepEvidence,
@@ -15,7 +15,7 @@ import {
 } from "@/lib/step-evidence";
 import {
   useTxQueue,
-  type ClaimAllRowBuild,
+  type QueuedTxBuild,
   type GraphQueueContext,
   type QueueInvariant,
 } from "@/hooks/useTxQueue";
@@ -93,7 +93,7 @@ function setup(initialIdentity: ActionIdentity = { account: userA, chainId: 1 })
   const rebuild = vi.fn(async (
     tx: QueuedTx,
     identity: ActionIdentity,
-  ): Promise<ClaimAllRowBuild> => ({
+  ): Promise<QueuedTxBuild> => ({
     status: "ready" as const,
     plan: executionPlan(tx, identity),
   }));
@@ -381,7 +381,7 @@ describe("useTxQueue graph-step recovery", () => {
     const rebuild = vi.fn(async (
       tx: QueuedTx,
       identity: ActionIdentity,
-    ): Promise<ClaimAllRowBuild> => ({
+    ): Promise<QueuedTxBuild> => ({
       status: "ready" as const,
       plan: executionPlan(tx, identity),
     }));
@@ -441,7 +441,7 @@ describe("useTxQueue graph-step recovery", () => {
     const rebuild = vi.fn(async (
       tx: QueuedTx,
       identity: ActionIdentity,
-    ): Promise<ClaimAllRowBuild> => ({
+    ): Promise<QueuedTxBuild> => ({
       status: "ready" as const,
       plan: executionPlan(tx, identity),
     }));

@@ -7,7 +7,7 @@ import { WagmiProvider, useConfig, useConnection } from "wagmi";
 // the adapter without anything going red. These tests exist to make the
 // production config assertable at all — they are cheap, and their absence was
 // the actual defect.
-import { wagmiAdapter, wagmiConfig } from "@/lib/wagmi";
+import { wagmiConfig } from "@/lib/wagmi";
 import { walletConfig } from "wallet-runtime";
 
 type InternalConfig = { _internal: { ssr?: boolean } };
@@ -22,16 +22,7 @@ describe("production wagmi config", () => {
     expect((wagmiConfig as unknown as InternalConfig)._internal.ssr).toBe(true);
   });
 
-  it("passes ssr through the Reown adapter, not just to a config we construct", () => {
-    // WagmiAdapter spreads its constructor params into `createConfig`, so the
-    // flag has to be set on the adapter. Asserting the adapter's own config
-    // rather than a re-export pins the thing that actually reaches wagmi.
-    expect((wagmiAdapter.wagmiConfig as unknown as InternalConfig)._internal.ssr).toBe(true);
-  });
-
   it("is the exact config the wallet runtime hands to WagmiProvider", () => {
-    // If these ever diverge, connections made through the AppKit modal never
-    // propagate to the app's wagmi hooks — the classic Reown footgun.
     expect(walletConfig).toBe(wagmiConfig);
   });
 

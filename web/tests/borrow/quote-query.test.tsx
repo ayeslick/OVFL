@@ -21,7 +21,7 @@ vi.mock("wagmi", () => ({
   usePublicClient: () => ({ simulateContract, getBlock }),
 }));
 
-function wrapper({ children }: { children: ReactNode }) {
+function Wrapper({ children }: { children: ReactNode }) {
   const [client] = useState(
     () =>
       new QueryClient({
@@ -109,7 +109,7 @@ describe("borrow quote query", () => {
           depth: 50n * ETHER,
           minLiquidity: 10n ** 15n,
         }),
-      { wrapper, initialProps: { amountRaw: "4" } },
+      { wrapper: Wrapper, initialProps: { amountRaw: "4" } },
     );
 
     await act(async () => {
@@ -168,7 +168,7 @@ describe("borrow quote query", () => {
           depth: 50n * ETHER,
           minLiquidity: 10n ** 15n,
         }),
-      { wrapper, initialProps: { amountRaw: "4" } },
+      { wrapper: Wrapper, initialProps: { amountRaw: "4" } },
     );
 
     await vi.waitFor(() => {
@@ -222,7 +222,7 @@ describe("borrow quote query", () => {
           depth: 50n * ETHER,
           minLiquidity: 10n ** 15n,
         }),
-      { wrapper, initialProps: { aprBps: 1000 } },
+      { wrapper: Wrapper, initialProps: { aprBps: 1000 } },
     );
 
     await act(async () => {

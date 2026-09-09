@@ -1,5 +1,5 @@
 import type { Address } from "viem";
-import type { QueuedTx } from "./claim-all";
+import type { QueuedTx } from "./queued-tx";
 export const GRAPH_STEP_CLEAR_TO_ZERO = "auth-clear-to-zero";
 export const GRAPH_STEP_SET_ALLOWANCE = "auth-set-allowance";
 export const GRAPH_STEP_SET_APPROVAL = "auth-set-approval";

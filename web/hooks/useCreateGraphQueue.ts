@@ -10,8 +10,8 @@ import { remainingQueuedTx } from "@/lib/graph-step-plan";
 import { resumeGraph, suppressSubmit } from "@/lib/composite-recovery";
 import { receiptFromClient, reconcileUnknownSteps } from "@/lib/resume-contract";
 import { listStepEvidence } from "@/lib/step-evidence";
-import { useTxQueue, type ClaimAllRowBuild } from "./useTxQueue";
-import type { QueuedTx } from "@/lib/claim-all";
+import { useTxQueue, type QueuedTxBuild } from "./useTxQueue";
+import type { QueuedTx } from "@/lib/queued-tx";
 
 type ReceiptClient = Parameters<typeof receiptFromClient>[0];
 
@@ -24,7 +24,7 @@ export function useCreateGraphQueue(args: {
     persist?: PersistPendingContext,
   ) => Promise<ActionExecutionResult>;
   retryRefresh: () => Promise<ActionExecutionResult | null>;
-  rebuild: (tx: QueuedTx, identity: ActionIdentity) => Promise<ClaimAllRowBuild>;
+  rebuild: (tx: QueuedTx, identity: ActionIdentity) => Promise<QueuedTxBuild>;
   client?: ReceiptClient | null;
 }) {
   const queue = useTxQueue({

@@ -1,0 +1,64 @@
+# Scratch decision record — schema: docs/maps/SCHEMAS.md §4
+summary_ref: "docs/plans/2026-09-09-001-refactor-frontend-reduction-plan.md tickets 08-10"
+
+goal: >
+  Factory bootstrap owns lens, approved series, and current plus prior
+  request books. Wallet-held streams come from one atomic lens read.
+  Wrap, unwrap, vault claim, and Create conversion leave /assets.
+
+state_keys_touched:
+  - watch.heldStreams
+  - watch.waitingRequests
+  - create.selectedMarket
+  - assets.flow
+
+writers_readers:
+  - writes: web/lib/protocol-bootstrap.ts
+  - writes: web/hooks/useStreams.ts
+  - writes: web/app/create/page.tsx
+  - reads: web/hooks/useAllMarkets.ts
+  - reads: web/components/watch/WatchApp.tsx
+  - reads: web/components/watch/WatchWrite.tsx
+
+trust_domains:
+  - fact: deployed lens lockup equals factory.ovrfloStream
+    domain: on-chain
+    moved_from: browser-only NEXT_PUBLIC_OVRFLO_LENS with no boot check
+  - fact: wallet-held stream set
+    domain: on-chain
+    moved_from: wall pager plus extra ERC-721 balanceOf
+  - fact: current and prior request books
+    domain: on-chain
+    moved_from: per-hook lending.router walks
+
+rejected_alternatives:
+  - option: Keep useAllMarkets as a second factory walk
+    why_not: Duplicate discovery can disagree with bootstrap.
+  - option: Keep the wall infinite query beside complete reads
+    why_not: Ticket 04 already windows inside loadCompleteStreams.
+  - option: Leave wrap and stream create on /assets
+    why_not: The owner pin deletes that route in this campaign.
+
+invariants_held:
+  - invariant: Missing or mismatched lens makes the protocol unavailable
+    how: Boot checks bytecode and lens.lockup() against factory.ovrfloStream().
+  - invariant: A successful lens call is all requested rows or a failure
+    how: useStreams calls loadCompleteStreams. Extra balanceOf is gone.
+  - invariant: Escrowed NFTs are not a second wallet-held row
+    how: Loans, requests, and Fixed Return stay on lending and book indexes.
+  - invariant: USD never enters calldata
+    how: wstETH recipe stays display-only stETH/USD times stEthPerToken.
+
+risks:
+  - risk: A large complete lens read still hits a provider size limit
+    residual: loadCompleteStreams windows once at COMPLETE_SET_WINDOW.
+  - risk: Create page loses Default-home chrome that was parked
+    residual: This campaign must not restore that UI.
+
+diff_hints:
+  - path: web/lib/protocol-bootstrap.ts
+    why: Registry now includes lens, markets, and books.
+  - path: web/hooks/useStreams.ts
+    why: Complete owner read replaces the wall pager.
+  - path: web/app/assets/page.tsx
+    why: Ticket 10 deletes this route.

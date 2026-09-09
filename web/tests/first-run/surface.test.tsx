@@ -66,7 +66,7 @@ describe("guided first run (AE5)", () => {
     expect(link).toHaveAttribute("rel", "noopener noreferrer");
     expect(link).toHaveAttribute("target", "_blank");
     expect(link).toHaveTextContent(/external/i);
-    expect(screen.getByRole("link", { name: /I ALREADY HOLD PT/i })).toHaveAttribute("href", "/assets");
+    expect(screen.getByRole("link", { name: /I ALREADY HOLD PT/i })).toHaveAttribute("href", "/create");
   });
 
   it("degrades a rotten Pendle URL to naming the series, not a fake button", () => {
