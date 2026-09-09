@@ -75,19 +75,17 @@ describe("kit labels, roles, and state classes", () => {
     expect(seen).toEqual(["usd"]);
   });
 
-  it("TokenUsdSwitch disables with USD UNAVAILABLE", () => {
-    render(<TokenUsdSwitch mode="usd" tokenLabel="wstETH" usdAvailable={false} onChange={() => undefined} />);
-    expect(screen.getByRole("button", { name: "USD UNAVAILABLE" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "USD UNAVAILABLE" })).toHaveAttribute(
-      "data-state",
-      "disabled-unavailable",
+  it("TokenUsdSwitch is absent when USD is unavailable", () => {
+    const { container } = render(
+      <TokenUsdSwitch mode="usd" tokenLabel="wstETH" usdAvailable={false} onChange={() => undefined} />,
     );
+    expect(container).toBeEmptyDOMElement();
   });
 
-  it("Amount keeps the token visible and names USD UNAVAILABLE", () => {
+  it("Amount stays token-only when USD is unavailable", () => {
     render(<Amount token="5.00000" symbol="wstETH" usdAvailable={false} mode="usd" />);
     expect(screen.getByText(/5\.00000/)).toBeInTheDocument();
-    expect(screen.getByText("USD UNAVAILABLE")).toBeInTheDocument();
+    expect(screen.queryByText("USD UNAVAILABLE")).not.toBeInTheDocument();
   });
 
   it("ActionButton requires a visible reason when disabled", () => {

@@ -29,7 +29,7 @@ function StripRetiredLens() {
 
 function ModeControl({ location }: { location: "account" | "menu" }) {
   const disclosure = useSyncExternalStore(subscribeDisclosure, getDisclosure, getDisclosure);
-  const label = disclosure === "advanced" ? "Return to Default" : "Go to Advanced";
+  if (disclosure !== "advanced") return null;
   return (
     <button
       type="button"
@@ -39,7 +39,7 @@ function ModeControl({ location }: { location: "account" | "menu" }) {
       data-disclosure={disclosure}
       onClick={toggleDisclosure}
     >
-      {label}
+      Return to Default
     </button>
   );
 }

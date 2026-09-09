@@ -1,64 +1,85 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
-import { SurfaceHeading } from "./SurfaceHeading";
-import { getDisclosure, subscribeDisclosure, toggleDisclosure } from "@/lib/disclosure";
+import { useEffect } from "react";
+import { rememberCreateReturn } from "@/lib/create-return";
+import { KitBackLink } from "./KitBackLink";
+import { KitIcon } from "./KitIcon";
 import "./kit.css";
 import "./surfaces.css";
 
 export function CreateChooser({
   title,
-  showHelp = false,
+  backHref,
+  backLabel,
+  returnHref = "/",
 }: {
   title: string;
-  showHelp?: boolean;
+  backHref?: string;
+  backLabel?: string;
+  returnHref?: string;
 }) {
-  const disclosure = useSyncExternalStore(subscribeDisclosure, getDisclosure, getDisclosure);
-  const modeLabel = disclosure === "advanced" ? "Return to Default" : "Go to Advanced";
+  useEffect(() => {
+    rememberCreateReturn(returnHref);
+  }, [returnHref]);
+
   return (
     <section className="kit-empty-layout default-hub" data-ui="UI-SHELL-HUB">
+      {backHref && backLabel ? <KitBackLink href={backHref}>{backLabel}</KitBackLink> : null}
       <header className="default-hub-welcome">
-        <SurfaceHeading>{title}</SurfaceHeading>
+        <h2 className="kit-surface-heading">{title}</h2>
       </header>
       <div className="kit-create-choices default-hub-types">
-        <a className="kit-create-choice kit-card kit-type-card" href="/borrow/" data-type="loan">
-          <span className="kit-medallion" data-identity="loan" aria-hidden="true" />
-          <h3>Self-Repaying Loan</h3>
+        <a className="kit-create-choice" href="/borrow/" data-type="loan">
+          <span className="kit-choice-icon" data-identity="loan" aria-hidden="true">
+            <KitIcon name="wave" />
+          </span>
+          <h2>Self-Repaying Loan</h2>
           <p>Access liquidity now. Your pledged stream repays the loan over time.</p>
-          <span className="kit-text-button">Create a loan</span>
+          <span className="kit-text-button">
+            Create a loan
+            <KitIcon name="arrow" />
+          </span>
         </a>
-        <a className="kit-create-choice kit-card kit-type-card" href="/supply/" data-type="fixed">
-          <span className="kit-medallion" data-identity="fixed" aria-hidden="true" />
-          <h3>Fixed Return</h3>
+        <a className="kit-create-choice" href="/supply/" data-type="fixed">
+          <span className="kit-choice-icon" data-identity="fixed" aria-hidden="true">
+            <KitIcon name="return" />
+          </span>
+          <h2>Fixed Return</h2>
           <p>Supply an OVRFLO asset at your chosen APR. Unmatched funds remain withdrawable.</p>
-          <span className="kit-text-button">Create a fixed return</span>
+          <span className="kit-text-button">
+            Create a fixed return
+            <KitIcon name="arrow" />
+          </span>
         </a>
-        <a className="kit-create-choice kit-card kit-type-card" href="/create/stream/" data-type="stream">
-          <span className="kit-medallion" data-identity="stream" aria-hidden="true" />
-          <h3>Stream</h3>
+        <a className="kit-create-choice" href="/create/stream/" data-type="stream">
+          <span className="kit-choice-icon" data-identity="stream" aria-hidden="true">
+            <KitIcon name="stream" />
+          </span>
+          <h2>Stream</h2>
           <p>Receive tokens now, with more releasing over time.</p>
-          <span className="kit-text-button">Create a stream</span>
+          <span className="kit-text-button">
+            Create a stream
+            <KitIcon name="arrow" />
+          </span>
         </a>
       </div>
-      {showHelp ? (
-        <aside className="default-hub-help">
-          <h3>Help</h3>
-          <p>Need exact controls for this destination?</p>
-          <button type="button" className="kit-mode" data-ui="UI-SHELL-MODE" data-location="help" onClick={toggleDisclosure}>
-            {modeLabel}
-          </button>
-        </aside>
-      ) : null}
     </section>
   );
 }
 
 export function DefaultHub({
   welcome,
-  help,
+  backHref,
+  backLabel,
+  returnHref,
 }: {
   welcome: string;
   help?: string;
+  backHref?: string;
+  backLabel?: string;
+  returnHref?: string;
 }) {
-  return <CreateChooser title={welcome} showHelp />;
+  return (
+    <CreateChooser title={welcome} backHref={backHref} backLabel={backLabel} returnHref={returnHref} />
+  );
 }

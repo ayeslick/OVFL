@@ -10,6 +10,9 @@ colors:
   muted: "#687E9F"
   border: "#DCE7F3"
   control_border: "#CBDFF1"
+  wallet_fill: "#F3F7FC"
+  wallet_border: "#ECF1F8"
+  wallet_dot: "#227CDF"
   primary: "#078BEF"
   primary_hover: "#0074D6"
   primary_soft: "#EEF7FF"
@@ -140,9 +143,12 @@ Desktop create flows show the active decision surface plus a sticky capsule prev
 
 ### Navigation and modes
 
-The header has no destination tabs. The logo and `OVRFLO` wordmark return to `/`. Wallet and network remain visible but secondary. Create is a flow. Empty Your OVRFLO is the three-type chooser. A hub **New position** control goes to `/create/`. `Portfolio` is not an alternate Default label.
+The header has no destination tabs. The logo and `OVRFLO` wordmark return to `/`. Wallet and network remain visible but secondary. Create is a flow. Home with no wallet, and empty Your OVRFLO, is the three-type start. A hub **New position** control goes to `/create/`. `Portfolio` is not an alternate Default label.
 
-`Go to Advanced` is available from desktop account navigation and the mobile menu on every Default route. The hub help panel may repeat it. Advanced exposes `Return to Default` in the same global location. A mode change preserves the current object or task when the destination supports it. Otherwise it routes to the closest truthful parent and explains the change.
+`Return to Default` appears only when Advanced disclosure is already on.
+Default chrome does not show `Go to Advanced`. A mode change preserves the
+current object or task when the destination supports it. Otherwise it routes
+to the closest truthful parent and explains the change.
 
 Destination URLs use a trailing slash. Advanced writes no path and no query param. Refresh on a destination lands in Default. `?lens=` is ignored and stripped. Unknown query keys must not crash. Pre-CS4 shapes have no compatibility redirects.
 
@@ -193,11 +199,11 @@ Motion confirms a state change rather than decorating an idle screen. Capsule se
 
 ## Shapes
 
-Primary controls are pills. Cards use a 28px radius. Major panels use a 28px radius. Status badges are pill-shaped. Rounding is shared across Default and Advanced.
+Primary controls are pills. Cards use a 28px radius. Major panels use a 28px radius. Status badges are pill-shaped. Rounding is shared across Default and Advanced. The header wallet is a soft-fill pill with a status dot: CONNECT WALLET when disconnected, the truncated live address when connected. It uses Arial, not the Advanced receipt face.
 
 The Default progress visual is the capsule: a tall rounded SVG whose stacked bands are Remaining / Repaid, Releasing / Released, or Arriving / Arrived / Claimed / Waiting. Loan Remaining and Repaid come from lending accounting. Stream Releasing and Released come from the stream schedule. Do not paint stream withdrawable as loan Repaid.
 
-Use one rounded-outline icon family with a 1.75px stroke and rounded caps. Loan and Stream use water/wave geometry. Fixed Return uses stable/growth geometry. The header uses the verified OVRFLO logo mark.
+Use one rounded-outline icon family with a 1.75px stroke and rounded caps. Loan uses the zip wave path. Stream uses the path-and-nodes mark (stroked S-curve plus three filled nodes). Fixed Return uses the zip house/growth path. The header uses the verified OVRFLO logo mark.
 
 ## Components
 
@@ -268,7 +274,7 @@ PT claim and unwrap are separate exits. PT claim requires maturity and sufficien
 - **Do** guide the user from a confirmed position to one valid next action.
 - **Do** keep confirmed cards visible during partial portfolio discovery.
 - **Do** group financial totals by underlying when token symbols differ.
-- **Do** expose Advanced globally while preserving the current object or task.
+- **Do** keep Advanced as disclosure. Show `Return to Default` only when Advanced is already on.
 - **Do** use exact token units wherever an amount affects a decision.
 - **Do** explain why a resting Fixed Return remains withdrawable and why no return is promised before match.
 - **Do** preserve completed and waiting positions in portfolio navigation.

@@ -268,4 +268,64 @@ describe("StreamCreate flow", () => {
     expect(screen.getAllByText(/DEPOSIT CAP 100.00 PT EXCEEDED/).length).toBeGreaterThan(0);
     expect(screen.getByRole("button", { name: "CONTINUE" })).toBeDisabled();
   });
+
+  it("keeps one heading when markets are unavailable and hides continue", () => {
+    render(
+      <StreamCreate
+        stage="market"
+        marketStatus="unavailable"
+        markets={[]}
+        selectedMarket={null}
+        onSelectMarket={vi.fn()}
+        underlyingSymbol="wstETH"
+        ovrfloSymbol="ovrfloWSTETH"
+        amountRaw=""
+        onAmount={vi.fn()}
+        ptBalanceLabel="UNAVAILABLE"
+        onContinue={vi.fn()}
+        steps={streamTrace({ needsPt: true, needsFee: true, ackRequired: false, stage: "market" })}
+        permissionLines={[]}
+        permissionState="skipped"
+        actionLines={[]}
+        actionState="ghosted"
+      />,
+    );
+    expect(screen.getByRole("heading", { name: "Choose a market" })).toBeInTheDocument();
+    expect(screen.queryByText("CREATE STREAM")).not.toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveTextContent("MARKETS UNAVAILABLE");
+    expect(screen.queryByRole("button", { name: "CONTINUE" })).not.toBeInTheDocument();
+    expect(screen.queryByText("SELECT A MARKET")).not.toBeInTheDocument();
+  });
+
+  it("shows CONTINUE after a market is selected", () => {
+    render(
+      <StreamCreate
+        stage="market"
+        marketStatus="ready"
+        markets={[
+          {
+            id: market,
+            vault: "0x00000000000000000000000000000000000000b2" as Address,
+            underlyingSymbol: "wstETH",
+            ovrfloSymbol: "ovrfloWSTETH",
+            expiry: 1_900_000_000n,
+          },
+        ]}
+        selectedMarket={market}
+        onSelectMarket={vi.fn()}
+        underlyingSymbol="wstETH"
+        ovrfloSymbol="ovrfloWSTETH"
+        amountRaw=""
+        onAmount={vi.fn()}
+        ptBalanceLabel="20.00 PT"
+        onContinue={vi.fn()}
+        steps={streamTrace({ needsPt: true, needsFee: true, ackRequired: false, stage: "market" })}
+        permissionLines={[]}
+        permissionState="skipped"
+        actionLines={[]}
+        actionState="ghosted"
+      />,
+    );
+    expect(screen.getByRole("button", { name: "CONTINUE" })).toBeEnabled();
+  });
 });

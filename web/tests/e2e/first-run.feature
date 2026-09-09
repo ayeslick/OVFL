@@ -6,8 +6,8 @@ Feature: First run
   Background:
     Given I am on the watch surface
 
-  @UI-WATCH-ENTRY-DISCONNECTED
-  Scenario: Disconnected visitor sees entry, not a fake empty wall
+  @UI-WATCH-EMPTY
+  Scenario: Disconnected visitor sees the three-type start, not first-run
     When I disconnect my wallet
     Then I see the disconnected entry
     And I do not see the first-run surface

@@ -3,8 +3,7 @@
 import { useConnect, useConnection, useDisconnect } from "wagmi";
 import type { Config } from "wagmi";
 import { wagmiConfig } from "@/lib/wagmi";
-import { formatAddress } from "@/lib/format";
-import { CopyValue } from "./CopyValue";
+import { WalletConnectControl, WalletConnectedControl } from "./kit/WalletControl";
 
 // Production wallet runtime, and one half of the app's only test seam.
 // Everything wallet-specific lives behind the `wallet-runtime` specifier.
@@ -25,48 +24,40 @@ export function WalletButton() {
   if (connected) {
     return (
       <span className="wallet-identity">
-        <CopyValue value={address ?? ""} display={formatAddress(address)} label="Copy wallet address" />
-        <button className="button mono" type="button" onClick={() => disconnect()}>
-          DISCONNECT
-        </button>
+        <WalletConnectedControl address={address ?? ""} onDisconnect={() => disconnect()} />
       </span>
     );
   }
 
   if (wallets.length === 0) {
     return (
-      <button className="button mono" type="button" disabled>
-        NO INJECTED WALLET
-      </button>
+      <span className="wallet-identity">
+        <WalletConnectControl disabled>NO INJECTED WALLET</WalletConnectControl>
+      </span>
     );
   }
 
   if (wallets.length === 1) {
     const wallet = wallets[0]!;
     return (
-      <button
-        className="button mono"
-        type="button"
-        disabled={isPending}
-        onClick={() => connect({ connector: wallet })}
-      >
-        CONNECT WALLET
-      </button>
+      <span className="wallet-identity">
+        <WalletConnectControl disabled={isPending} onClick={() => connect({ connector: wallet })}>
+          CONNECT WALLET
+        </WalletConnectControl>
+      </span>
     );
   }
 
   return (
     <span className="wallet-identity">
       {wallets.map((wallet) => (
-        <button
+        <WalletConnectControl
           key={wallet.uid}
-          className="button mono"
-          type="button"
           disabled={isPending}
           onClick={() => connect({ connector: wallet })}
         >
           {`CONNECT ${wallet.name}`.toUpperCase()}
-        </button>
+        </WalletConnectControl>
       ))}
     </span>
   );

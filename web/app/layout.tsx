@@ -40,7 +40,7 @@ const DIRECTION_CONTRACT = `<!--
 THESIS: A calm path through one economic choice at a time — exact consequences before signing.
 OWN-WORLD: White canvas, 28px cards, pill actions, navy ink, cobalt primary; Arial; SVG capsules; Default and Advanced share one token system.
 STORY: Default home is Your OVRFLO. The header has no destination tabs. Create is a flow. Advanced is disclosure, not a second home.
-FIRST VIEWPORT: Logo wordmark and wallet. Empty home is the three-type chooser.
+FIRST VIEWPORT: Logo wordmark and wallet. Home with no wallet is the three-type start.
 FINISH: DESIGN.md is normative; the approved UI zip is acceptance evidence for pixels.
 -->`;
 

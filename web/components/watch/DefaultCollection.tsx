@@ -39,6 +39,9 @@ export function DefaultCollection({
   onOpenLoan,
   onOpenPosition,
   onOpenStream,
+  backHref,
+  backLabel,
+  onBack,
 }: {
   type: PortfolioType;
   loans: readonly BorrowerLoanRow[];
@@ -51,6 +54,9 @@ export function DefaultCollection({
   onOpenLoan: (lending: Address, id: bigint) => void;
   onOpenPosition: (lending: Address, id: bigint) => void;
   onOpenStream: (id: bigint) => void;
+  backHref?: string;
+  backLabel?: string;
+  onBack?: () => void;
 }) {
   const cards: CollectionCard[] =
     type === "loan"
@@ -74,6 +80,9 @@ export function DefaultCollection({
       cards={cards}
       sort={sort}
       onSort={onSort}
+      backHref={backHref}
+      backLabel={backLabel}
+      onBack={onBack}
     />
   );
 }

@@ -69,14 +69,13 @@ describe("inventory — product truth", () => {
     expect(hits).toEqual([]);
   });
 
-  it("watch disconnected entry does not invent TVL", () => {
+  it("watch home does not invent TVL or a disconnected copy block", () => {
     const source = read(join(WEB_ROOT, "components", "watch", "WatchApp.tsx"));
-    const start = source.indexOf("function DisconnectedEntry");
-    expect(start).toBeGreaterThan(-1);
-    const slice = source.slice(start, start + 1200);
-    expect(slice).not.toMatch(/TVL/i);
-    expect(slice).not.toMatch(/health factor/i);
-    expect(slice).toMatch(/Your OVRFLO: positions/i);
+    expect(source).not.toMatch(/function DisconnectedEntry/);
+    expect(source).not.toMatch(/UI-WATCH-ENTRY-DISCONNECTED/);
+    expect(source).not.toMatch(/TVL/i);
+    expect(source).not.toMatch(/health factor/i);
+    expect(source).not.toMatch(/Your OVRFLO: positions/i);
   });
 
   it("projection never appears as a write gate in watch writes or action builders", () => {

@@ -16,9 +16,10 @@ vi.mock("@/hooks/useAcknowledgment", () => ({
 }));
 
 describe("HostedConvertPanel", () => {
-  it("shows the local-fork unavailable copy and does not offer convert", () => {
-    render(<HostedConvertPanel market={null} signingAllowed />);
-    expect(screen.getByText(HOSTED_LOCAL_UNAVAILABLE_COPY)).toBeInTheDocument();
+  it("omits convert when the hosted path is unavailable", () => {
+    const { container } = render(<HostedConvertPanel market={null} signingAllowed />);
+    expect(container).toBeEmptyDOMElement();
+    expect(screen.queryByText(HOSTED_LOCAL_UNAVAILABLE_COPY)).toBeNull();
     expect(screen.queryByRole("button", { name: "CONVERT" })).toBeNull();
   });
 });

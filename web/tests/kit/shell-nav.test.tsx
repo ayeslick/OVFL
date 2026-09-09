@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { DefaultHub } from "@/components/kit/DefaultHub";
 import { Shell } from "@/components/kit/Shell";
 import { getDisclosure, resetDisclosure, setDisclosure } from "@/lib/disclosure";
@@ -61,23 +61,27 @@ describe("CS4-U1 Default shell navigation", () => {
     );
     expect(screen.getByText("CONNECT WALLET")).toBeInTheDocument();
     expect(screen.getByText("Ethereum")).toBeInTheDocument();
-    fireEvent.click(accountMode());
+    act(() => {
+      setDisclosure("advanced");
+    });
     expect(getDisclosure()).toBe("advanced");
     expect(screen.getByText("CONNECT WALLET")).toBeInTheDocument();
     expect(screen.getByText("Ethereum")).toBeInTheDocument();
     expect(document.querySelector('[data-ui="UI-SHELL"]')).toHaveAttribute("data-disclosure", "advanced");
   });
 
-  it("exposes Go to Advanced in Default and Return to Default in Advanced without writing a query", () => {
+  it("hides Go to Advanced on Default and shows Return to Default in Advanced without writing a query", () => {
     window.history.replaceState(null, "", "/create/?lending=0x1");
     render(
       <Shell currentNav="create" wallet="CONNECT WALLET">
-        <DefaultHub welcome="Choose a position type" />
+        <DefaultHub welcome="Choose an OVRFLO" />
       </Shell>,
     );
-    expect(accountMode()).toHaveTextContent("Go to Advanced");
+    expect(screen.queryByRole("button", { name: "Go to Advanced" })).not.toBeInTheDocument();
     expect(window.location.search).toBe("?lending=0x1");
-    fireEvent.click(accountMode());
+    act(() => {
+      setDisclosure("advanced");
+    });
     expect(accountMode()).toHaveTextContent("Return to Default");
     expect(window.location.search).toBe("?lending=0x1");
     expect(window.location.pathname).toBe("/create/");
@@ -113,14 +117,14 @@ describe("CS4-U1 hub layout and create chooser", () => {
     const css = readFileSync(join(WEB_ROOT, "components/kit/kit.css"), "utf8");
     expect(css).toMatch(/@media \(min-width: 1024px\)/);
     expect(css).toMatch(/\.default-hub-welcome\s*\{\s*grid-column:\s*1\s*\/\s*-1;/);
-    expect(css).toMatch(/\.default-hub-types\s*\{\s*grid-template-columns:\s*1fr 1fr 1fr;/);
+    expect(css).toMatch(/\.default-hub-types\s*\{\s*grid-template-columns:\s*1fr 1fr;/);
     expect(css).not.toMatch(/\.default-hub-lower\s*\{\s*grid-template-columns:\s*2fr 1fr;/);
     expect(css).toMatch(/@media \(max-width: 767px\)/);
     expect(css).toMatch(/\.kit-nav\s*\{\s*display:\s*none;/);
   });
 
   it("offers Self-Repaying Loan, Fixed Return, and Stream on the create chooser", () => {
-    const { container } = render(<DefaultHub welcome="Choose a position type" />);
+    const { container } = render(<DefaultHub welcome="Choose an OVRFLO" />);
     expect(container.querySelector("[data-type=loan]")).toHaveAttribute("href", "/borrow/");
     expect(container.querySelector("[data-type=fixed]")).toHaveAttribute("href", "/supply/");
     expect(container.querySelector("[data-type=stream]")).toHaveAttribute("href", "/create/stream/");

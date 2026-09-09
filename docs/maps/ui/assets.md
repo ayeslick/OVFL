@@ -123,7 +123,10 @@ stream is `borrow.md`.
 - **States.** `loading`, `ready`, `empty`, `unavailable`, `selected`.
 - **Action.** Continue to `UI-ASSETS-STREAM-ENTER-PT`.
 - **Copy rules.** Name series, underlying, maturity. The deposit "mints the
-  market's ovrflo token" — never a hardcoded `ovrfloWSTETH`.
+  market's ovrflo token" — never a hardcoded `ovrfloWSTETH`. One heading:
+  `Choose a market`. Do not print `CREATE STREAM`. CONTINUE appears after a
+  series is selected. Unavailable prints `MARKETS UNAVAILABLE` and does not
+  mount a disabled continue.
 - **Data authority.** `on-chain` — factory registry and series info.
 
 ## `UI-ASSETS-STREAM-ENTER-PT`

@@ -9,14 +9,19 @@ export function FlowLayout({
   children,
   segments,
   compact = false,
+  back,
 }: {
   children: ReactNode;
   segments: readonly CapsuleSegment[];
   compact?: boolean;
+  back?: ReactNode;
 }) {
   return (
     <div className="kit-flow-layout" data-compact={compact ? "true" : undefined}>
-      <div className="kit-flow-main">{children}</div>
+      <div className="kit-flow-main">
+        {back}
+        {children}
+      </div>
       <aside className="kit-preview">
         <Capsule segments={segments} draft compact={compact} />
         <CapsuleLegend segments={segments} />

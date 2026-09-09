@@ -12,7 +12,6 @@ import { chainId } from "@/lib/config";
 import { getDisclosure, setDisclosure, subscribeDisclosure } from "@/lib/disclosure";
 import {
   HOSTED_IMPACT_COPY,
-  HOSTED_LOCAL_UNAVAILABLE_COPY,
   PENDLE_ROUTER_V4,
   evaluateHostedPolicy,
   hostedConvertEnabled,
@@ -50,13 +49,7 @@ export function HostedConvertPanel({
       ? (parseSlippageBps(slippageRaw) ?? PENDLE_SLIPPAGE_BPS)
       : resolveHostedSlippageBps("default");
 
-  if (!enabled) {
-    return (
-      <div className="assets-banner" data-hosted-convert="unavailable">
-        <p>{HOSTED_LOCAL_UNAVAILABLE_COPY}</p>
-      </div>
-    );
-  }
+  if (!enabled) return null;
 
   if (!market || !account) return null;
 

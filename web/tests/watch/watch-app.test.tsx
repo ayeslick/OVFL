@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Address } from "viem";
 import { WatchApp } from "@/components/watch/WatchApp";
@@ -6,7 +6,7 @@ import type { LenderPositionRow } from "@/hooks/useLenderBook";
 import type { BorrowerLoanRow } from "@/hooks/useBorrowerBook";
 import type { HydratedStream } from "@/hooks/useStreams";
 import { loadingOutcome, readFailure, readyOutcome, unavailableOutcome } from "@/lib/read-outcome";
-import { resetDisclosure } from "@/lib/disclosure";
+import { resetDisclosure, setDisclosure } from "@/lib/disclosure";
 import { writeWatchSearch } from "@/lib/watch-url";
 import { idlePager } from "../inventory/fixtures";
 
@@ -323,7 +323,9 @@ function stubViewport(width: number) {
 }
 
 function goToAdvanced() {
-  fireEvent.click(screen.getAllByRole("button", { name: "Go to Advanced" })[0]!);
+  act(() => {
+    setDisclosure("advanced");
+  });
 }
 
 function supplyRow(id: bigint, lending: Address = LENDING, market: Address = MARKET): LenderPositionRow {
@@ -403,7 +405,7 @@ describe("watch shell + entry", () => {
     expect(screen.getByText(/Factory has no bytecode/i)).toBeInTheDocument();
   });
 
-  it("shows the disconnected entry without protocol metrics", () => {
+  it("shows the three-type start without a disconnected copy block", () => {
     render(<WatchApp />);
     expect(screen.getByRole("heading", { name: "OVRFLO" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "CONNECT WALLET" })).toBeInTheDocument();
@@ -412,15 +414,20 @@ describe("watch shell + entry", () => {
     expect(nav?.textContent).toContain("Your OVRFLO");
     expect(nav?.textContent).toContain("New position");
     expect(nav?.textContent).not.toContain("Activity");
-    expect(screen.getByText(/Your OVRFLO: positions/i)).toBeInTheDocument();
+    expect(document.querySelector("[data-ui='UI-WATCH-EMPTY']")).toHaveAttribute("data-state", "start");
+    expect(screen.getByRole("link", { name: /Self-Repaying Loan/i })).toHaveAttribute("href", "/borrow/");
+    expect(screen.getByRole("link", { name: /Fixed Return/i })).toHaveAttribute("href", "/supply/");
+    expect(screen.getByRole("link", { name: /Create a stream/i })).toHaveAttribute("href", "/create/stream/");
+    expect(screen.queryByText(/Your OVRFLO: positions/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/TVL/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/you have no positions/i)).not.toBeInTheDocument();
+    expect(document.querySelector("[data-ui='UI-SHELL-BREADCRUMB']")).toBeNull();
   });
 
   it("renders empty Your OVRFLO plus Create when every book is confirmed empty", async () => {
     fx.connected = true;
     render(<WatchApp />);
-    expect(document.querySelector("[data-ui='UI-WATCH-EMPTY']")).not.toBeNull();
+    expect(document.querySelector("[data-ui='UI-WATCH-EMPTY']")).toHaveAttribute("data-state", "ready");
     expect(document.querySelector("[data-ui='UI-WATCH-EMPTY-CREATE']")).toHaveAttribute("href", "/create/");
     expect(document.querySelector("[data-control='UI-FIRST-RUN-SURFACE']")).toBeNull();
     expect(screen.queryByRole("tab", { name: "SUPPLIED" })).not.toBeInTheDocument();
@@ -487,13 +494,14 @@ describe("watch shell + entry", () => {
     expect(window.location.search).toMatch(/position=26/);
     expect(screen.getByRole("article")).toHaveAttribute("data-region", "supplied-detail");
     expect(screen.queryByRole("button", { name: "Back to supplied" })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Your returns" })).toHaveAttribute("href", "/?type=fixed");
     wide.unmount();
 
     stubViewport(360);
     writeWatchSearch({ selection: { kind: "position", lending: LENDING, id: 26n } }, "replace");
     render(<WatchApp />);
-    expect(screen.getByRole("button", { name: "Back to supplied" })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Back to supplied" }));
+    expect(screen.getByRole("link", { name: "Your returns" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("link", { name: "Your returns" }));
     await waitFor(() => {
       expect(window.location.search).not.toMatch(/position=/);
     });
@@ -791,6 +799,9 @@ describe("watch shell + entry", () => {
         pairsTruncated: false,
       },
     ];
+    act(() => {
+      setDisclosure("advanced");
+    });
     render(<WatchApp />);
     fireEvent.click(screen.getByRole("button", { name: "REFRESH" }));
     expect(advancePin).toHaveBeenCalled();
@@ -904,6 +915,18 @@ describe("watch shell + entry", () => {
     fireEvent.click(screen.getByRole("button", { name: /Self-Repaying Loans/ }));
     expect(window.location.search).toMatch(/type=loan/);
     expect(screen.getByRole("button", { name: /LOAN #12/ })).toBeInTheDocument();
+    expect(
+      document.querySelector("[data-ui='UI-WATCH-COLLECTION'] [data-ui='UI-SHELL-BREADCRUMB']"),
+    ).toHaveAttribute("href", "/");
+    fireEvent.click(
+      document.querySelector("[data-ui='UI-WATCH-COLLECTION'] [data-ui='UI-SHELL-BREADCRUMB']")!,
+    );
+    expect(document.querySelector("[data-ui='UI-WATCH-HUB']")).not.toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: /Self-Repaying Loans/ }));
+    fireEvent.click(screen.getByRole("button", { name: /LOAN #12/ }));
+    const detailBack = document.querySelector("[data-ui='UI-SHELL-BREADCRUMB']");
+    expect(detailBack).toHaveAttribute("href", "/?type=loan");
+    expect(detailBack).toHaveTextContent("Your loans");
   });
 
   it("keeps waiting and matched supplies reachable after sort", async () => {

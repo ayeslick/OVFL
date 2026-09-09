@@ -59,8 +59,8 @@ Region set: `docs/adr/0001-watch-surface-region-set.md`.
 - **CS-S11** — No skeleton that resembles data: no placeholder rows, rates, ribbons, or
   zeroed totals standing in for an unanswered question.
   *`UI-SHELL-ROUTE-LOADING` · `UI-SHELL-ENTRY-SYNCING` · `first-run.md` rule 2.*
-- **CS-S12** — Disconnected is a precondition, not empty and not an error. One wording,
-  `CONNECT WALLET`; no zeros, no red, no "you have no positions".
+- **CS-S12** — Disconnected is a precondition, not a scanned empty book and not an
+  error. One wording, `CONNECT WALLET`; no zeros, no red, no "you have no positions".
   *`UI-SHELL-ENTRY-DISCONNECTED` · `UI-SHELL-WALLET` · `shell.md` rule 1.*
 
 ## 2. Trust domains and gates

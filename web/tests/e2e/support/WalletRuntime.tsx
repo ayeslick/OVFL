@@ -5,8 +5,7 @@ import { mainnet as viemMainnet } from "wagmi/chains";
 import { mock } from "wagmi/connectors";
 import type { Address } from "viem";
 import { rpcUrl } from "@/lib/config";
-import { formatAddress } from "@/lib/format";
-import { CopyValue } from "@/components/CopyValue";
+import { WalletConnectControl, WalletConnectedControl } from "@/components/kit/WalletControl";
 
 // The E2E wallet runtime. Turbopack resolves the `wallet-runtime` specifier
 // here when E2E_WALLET_RUNTIME=1 (see next.config.ts), so this file is only
@@ -76,26 +75,19 @@ export function WalletButton() {
   return (
     <span className="wallet-identity">
       {connected ? (
-        <>
-          <CopyValue value={address ?? ""} display={formatAddress(address)} label="Copy wallet address" />
-          <button className="button mono" type="button" onClick={() => disconnect()}>
-            DISCONNECT
-          </button>
-        </>
+        <WalletConnectedControl address={address ?? ""} onDisconnect={() => disconnect()} />
       ) : (
-        <button
-          className="button mono"
-          type="button"
+        <WalletConnectControl
           onClick={() => {
             if (devConnector) connect({ connector: devConnector });
           }}
         >
           CONNECT WALLET
-        </button>
+        </WalletConnectControl>
       )}
       {emptyConnector ? (
         <button
-          className="button mono"
+          className="kit-wallet-e2e"
           type="button"
           data-ui="UI-E2E-USE-EMPTY-WALLET"
           onClick={() => {

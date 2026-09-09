@@ -23,6 +23,8 @@ describe("CS4-U1 visual tokens", () => {
       ["muted", "#687E9F"],
       ["border", "#DCE7F3"],
       ["primary", "#078BEF"],
+      ["wallet_fill", "#F3F7FC"],
+      ["wallet_dot", "#227CDF"],
       ["loan", "#079CF0"],
       ["fixed_return", "#06966D"],
     ];
@@ -31,6 +33,8 @@ describe("CS4-U1 visual tokens", () => {
     }
     expect(globals).toContain("--canvas: #ffffff");
     expect(globals).toContain("--primary: #078bef");
+    expect(globals).toContain("--wallet-fill: #f3f7fc");
+    expect(globals).toContain("--wallet-dot: #227cdf");
     expect(globals).toContain("--radius-control: 999px");
     expect(globals).toContain("--radius-card: 28px");
     expect(globals).toContain("--gold: var(--primary)");
@@ -42,6 +46,8 @@ describe("CS4-U1 visual tokens", () => {
     expect(css).toContain("background: var(--surface)");
     expect(css).toContain("border-radius: var(--radius-card)");
     expect(css).toContain("background: var(--primary)");
+    expect(css).toContain(".kit-wallet");
+    expect(css).toContain("background: var(--wallet-fill)");
     expect(css).toContain(".kit-medallion");
     expect(css).toContain('[data-disclosure="advanced"]');
     expect(css).not.toMatch(/letter-spacing:\s*0\.1em/);

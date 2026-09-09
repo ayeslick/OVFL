@@ -22,6 +22,7 @@ import { isAddressEqual, parseEventLogs, type Address, type Log } from "viem";
 import { WalletButton } from "wallet-runtime";
 import { ActionButton } from "@/components/kit/ActionButton";
 import { Amount } from "@/components/kit/Amount";
+import { CreateFlowBack } from "@/components/kit/CreateFlowBack";
 import { Shell } from "@/components/kit/Shell";
 import { StatusLine } from "@/components/kit/StatusLine";
 import { TokenUsdSwitch } from "@/components/kit/TokenUsdSwitch";
@@ -804,7 +805,11 @@ export function BorrowFlow() {
     <Shell
       currentNav="create"
       wallet={<WalletButton />}
-      status={<StatusLine status={freshness.kind} asOf={asOf} usdUnavailable={usdUnavailable} />}
+      status={
+        disclosure === "advanced" ? (
+          <StatusLine status={freshness.kind} asOf={asOf} usdUnavailable={usdUnavailable} />
+        ) : undefined
+      }
     >
       <ModalErrorBoundary
         control="UI-REVIEW-ERROR-BOUNDARY"
@@ -813,33 +818,41 @@ export function BorrowFlow() {
         onReset={() => setBodyKey((key) => key + 1)}
       >
         <div className="borrow-flow" data-split={stage === "review" ? "true" : "false"} data-graph-id={attemptId ?? undefined} key={bodyKey}>
-          <SurfaceState
-            state={surface}
-            topology="borrow"
-            onRefresh={
-              surface === "STALE"
-                ? () => {
-                    void queryClient.invalidateQueries();
-                    stale.setStaleRecovery(false);
-                  }
-                : undefined
-            }
-          />
-          {walletReset.walletChanged ? (
-            <div className="borrow-notice" role="alert">
-              <p>WALLET CHANGED — RE-ENTER</p>
-              <ActionButton onClick={walletReset.acknowledge}>CONTINUE</ActionButton>
-            </div>
+          {disclosure === "advanced" ? (
+            <SurfaceState
+              state={surface}
+              topology="borrow"
+              onRefresh={
+                surface === "STALE"
+                  ? () => {
+                      void queryClient.invalidateQueries();
+                      stale.setStaleRecovery(false);
+                    }
+                  : undefined
+              }
+            />
           ) : null}
-          {!connected ? (
-            <div className="borrow-handoff">
-              <p className="borrow-kicker">BORROW</p>
-              <h2 className="borrow-title">Connect a wallet</h2>
-              <p className="borrow-lede">A connected wallet is required to list eligible streams.</p>
-            </div>
+          {walletReset.walletChanged ? (
+            <>
+              <CreateFlowBack />
+              <div className="borrow-notice" role="alert">
+                <p>WALLET CHANGED — RE-ENTER</p>
+                <ActionButton onClick={walletReset.acknowledge}>CONTINUE</ActionButton>
+              </div>
+            </>
+          ) : null}
+          {!connected && !walletReset.walletChanged ? (
+            <>
+              <CreateFlowBack />
+              <div className="borrow-handoff">
+                <p className="borrow-kicker">BORROW</p>
+                <h2 className="borrow-title">Connect a wallet</h2>
+                <p className="borrow-lede">A connected wallet is required to list eligible streams.</p>
+              </div>
+            </>
           ) : null}
           {connected && !walletReset.walletChanged ? (
-            <FlowLayout compact={compact} segments={borrowSegments}>
+            <FlowLayout compact={compact} segments={borrowSegments} back={<CreateFlowBack />}>
             <CreateStageFrame
               stage={stage}
               visibility={visibility}
@@ -898,6 +911,12 @@ export function BorrowFlow() {
                     onChange={setAmountRaw}
                     onMax={onMax}
                   />
+                  <TokenUsdSwitch
+                    mode={usdMode}
+                    tokenLabel={underlyingSymbol}
+                    usdAvailable={usdAvailable}
+                    onChange={setUsdMode}
+                  />
                   <ActionButton
                     variant="primary"
                     onClick={goNextStage}
@@ -948,7 +967,7 @@ export function BorrowFlow() {
                   onReview={onReview}
                   reviewLabel={posting ? "REVIEW REQUEST" : "REVIEW BORROW"}
                   hideAmount
-                  hideUsd={disclosure === "default"}
+                  hideUsd={!usdAvailable}
                 />
               ) : null}
               {stage === "review" &&

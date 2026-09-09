@@ -15,18 +15,17 @@ export function Amount({
   usdAvailable: boolean;
   mode?: "token" | "usd";
 }) {
-  const usdUnavailable = mode === "usd" && !usdAvailable;
+  const showUsd = mode === "usd" && usdAvailable && Boolean(usd);
   return (
     <span
       className="kit-amount"
-      data-mode={mode}
-      data-state={usdUnavailable ? "usd-unavailable" : usdAvailable ? "ready" : "token-only"}
+      data-mode={showUsd ? "usd" : "token"}
+      data-state={usdAvailable ? "ready" : "token-only"}
     >
       <span className="kit-amount-token">
         {token} {symbol}
       </span>
-      {mode === "usd" && usdAvailable && usd ? <span className="kit-amount-usd">{usd}</span> : null}
-      {usdUnavailable ? <span className="kit-amount-usd">USD UNAVAILABLE</span> : null}
+      {showUsd ? <span className="kit-amount-usd">{usd}</span> : null}
     </span>
   );
 }

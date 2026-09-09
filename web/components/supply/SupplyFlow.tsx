@@ -20,6 +20,7 @@ import { buildFixedCreateContext, marketByTerm } from "@/lib/create-flow-context
 import { getDisclosure, subscribeDisclosure } from "@/lib/disclosure";
 import { ActionButton } from "@/components/kit/ActionButton";
 import { Amount } from "@/components/kit/Amount";
+import { CreateFlowBack } from "@/components/kit/CreateFlowBack";
 import { Shell } from "@/components/kit/Shell";
 import { StatusLine } from "@/components/kit/StatusLine";
 import { TokenUsdSwitch } from "@/components/kit/TokenUsdSwitch";
@@ -737,37 +738,49 @@ export function SupplyFlow() {
     <Shell
       currentNav="create"
       wallet={<WalletButton />}
-      status={<StatusLine status={freshness.kind} asOf={asOf} usdUnavailable={usdUnavailable} />}
+      status={
+        disclosure === "advanced" ? (
+          <StatusLine status={freshness.kind} asOf={asOf} usdUnavailable={usdUnavailable} />
+        ) : undefined
+      }
     >
       <ModalErrorBoundary control="UI-REVIEW-ERROR-BOUNDARY" onReset={() => setBodyKey((key) => key + 1)}>
         <div className="supply-flow" data-split={stage === "review" ? "true" : "false"} data-graph-id={attemptId ?? undefined} key={bodyKey}>
-          <SurfaceState
-            state={surface}
-            topology="supply"
-            onRefresh={
-              surface === "STALE"
-                ? () => {
-                    void queryClient.invalidateQueries();
-                    stale.setStaleRecovery(false);
-                  }
-                : undefined
-            }
-          />
-          {walletReset.walletChanged ? (
-            <div className="supply-notice" role="alert">
-              <p>WALLET CHANGED — RE-ENTER</p>
-              <ActionButton onClick={walletReset.acknowledge}>CONTINUE</ActionButton>
-            </div>
+          {disclosure === "advanced" ? (
+            <SurfaceState
+              state={surface}
+              topology="supply"
+              onRefresh={
+                surface === "STALE"
+                  ? () => {
+                      void queryClient.invalidateQueries();
+                      stale.setStaleRecovery(false);
+                    }
+                  : undefined
+              }
+            />
           ) : null}
-          {!connected ? (
-            <div className="supply-handoff">
-              <p className="supply-kicker">SUPPLY</p>
-              <h2 className="supply-title">Connect a wallet</h2>
-              <p className="supply-lede">A connected wallet is required to supply ovrfloToken liquidity.</p>
-            </div>
+          {walletReset.walletChanged ? (
+            <>
+              <CreateFlowBack />
+              <div className="supply-notice" role="alert">
+                <p>WALLET CHANGED — RE-ENTER</p>
+                <ActionButton onClick={walletReset.acknowledge}>CONTINUE</ActionButton>
+              </div>
+            </>
+          ) : null}
+          {!connected && !walletReset.walletChanged ? (
+            <>
+              <CreateFlowBack />
+              <div className="supply-handoff">
+                <p className="supply-kicker">SUPPLY</p>
+                <h2 className="supply-title">Connect a wallet</h2>
+                <p className="supply-lede">A connected wallet is required to supply ovrfloToken liquidity.</p>
+              </div>
+            </>
           ) : null}
           {connected && !walletReset.walletChanged ? (
-            <FlowLayout compact={compact} segments={supplySegments}>
+            <FlowLayout compact={compact} segments={supplySegments} back={<CreateFlowBack />}>
             <CreateStageFrame
               stage={stage}
               visibility={visibility}
@@ -837,18 +850,16 @@ export function SupplyFlow() {
                 }}
                 onMax={onMax}
               />
-              {stage === "amount" ? (
-                <ActionButton variant="primary" onClick={() => setStage("outcome")}>
-                  CONTINUE
-                </ActionButton>
-              ) : null}
-              {stage === "outcome" && disclosure !== "default" ? (
               <TokenUsdSwitch
                 mode={usdMode}
                 tokenLabel={supplySymbol}
                 usdAvailable={usdAvailable}
                 onChange={setUsdMode}
               />
+              {stage === "amount" ? (
+                <ActionButton variant="primary" onClick={() => setStage("outcome")}>
+                  CONTINUE
+                </ActionButton>
               ) : null}
               {parsedAmount.ok ? (
                 <Amount

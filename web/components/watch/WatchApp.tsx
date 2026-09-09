@@ -6,6 +6,7 @@ import { useConnection } from "wagmi";
 import { WalletButton } from "wallet-runtime";
 import { Footer } from "@/components/Footer";
 import { RegionErrorBoundary } from "@/components/ModalErrorBoundary";
+import { KitBackLink } from "@/components/kit/KitBackLink";
 import { Shell } from "@/components/kit/Shell";
 import { StatusLine } from "@/components/kit/StatusLine";
 import { SurfaceState } from "@/components/kit/SurfaceState";
@@ -401,8 +402,10 @@ export function WatchApp() {
       restoreOpenerOrHeading(openerRef.current, heading, openerKeyRef.current);
       return;
     }
+    if (!connected) return;
+    if (surface.kind === "empty" || surface.kind === "hub") return;
     heading?.focus();
-  }, [surfaceKey]);
+  }, [connected, surface.kind, surfaceKey]);
 
   const loanTotals = groupTotalsByUnderlying([
     ...loans.map((loan) => {
@@ -625,7 +628,7 @@ export function WatchApp() {
     />
   );
 
-  const defaultCollection = (type: PortfolioType) => (
+  const defaultCollection = (type: PortfolioType, withHubBack = false) => (
     <DefaultCollection
       type={type}
       loans={loans}
@@ -638,6 +641,9 @@ export function WatchApp() {
       onOpenLoan={(lending, id) => onSelect({ kind: "loan", lending, id })}
       onOpenPosition={(lending, id) => onSelect({ kind: "position", lending, id })}
       onOpenStream={(id) => onSelect({ kind: "stream", id })}
+      backHref={withHubBack ? "/" : undefined}
+      backLabel={withHubBack ? "Your OVRFLO" : undefined}
+      onBack={withHubBack ? url.goHome : undefined}
     />
   );
 
@@ -649,68 +655,77 @@ export function WatchApp() {
     </>
   );
 
-  const defaultBody = !portfolioComplete ? (
+  const detailBack =
+    canLeaveDetail && (streamSelected || surface.kind === "detail")
+      ? selectedWaiting || url.selection.kind === "loan"
+        ? { href: "/?type=loan", label: "Your loans" }
+        : url.selection.kind === "position"
+          ? { href: "/?type=fixed", label: "Your returns" }
+          : { href: "/?type=stream", label: "Your streams" }
+      : null;
+
+  const defaultBody = !connected ? (
+    <PortfolioEmpty state="start" />
+  ) : !portfolioComplete ? (
     <PortfolioIncomplete
       streamsDegraded={streamsDegraded ? <StreamsDegraded kind={streamsDegraded} /> : null}
     >
       {confirmedCards}
     </PortfolioIncomplete>
   ) : streamSelected || surface.kind === "detail" ? (
-    details
+    <>
+      {detailBack ? (
+        <KitBackLink
+          href={detailBack.href}
+          onClick={() => {
+            backPendingRef.current = true;
+            url.deselect();
+          }}
+        >
+          {detailBack.label}
+        </KitBackLink>
+      ) : null}
+      {details}
+    </>
   ) : surface.kind === "empty" ? (
     <PortfolioEmpty />
   ) : surface.kind === "hub" ? (
     <PortfolioHub groups={hubGroups} onOpenCollection={onOpenCollection} />
   ) : surface.kind === "collection" ? (
-    defaultCollection(surface.type)
+    defaultCollection(surface.type, hubGroups.length > 1)
   ) : (
     details
   );
 
-  const defaultSurfaceState =
-    surface.kind === "empty" || surface.kind === "hub"
-      ? wallSurface === "STALE"
-        ? "STALE"
-        : "READY"
-      : wallSurface;
-
   const showWatchSplit = connected && isAdvanced && entry !== "unavailable";
-  const showDefault = connected && !isAdvanced && entry !== "unavailable";
-  const showBack =
-    narrow &&
-    detailOpen &&
-    canLeaveDetail &&
-    (showWatchSplit || (showDefault && (surface.kind === "detail" || streamSelected)));
+  const showDefault = entry !== "unavailable" && (!isAdvanced || !connected);
 
   return (
     <Shell
       currentNav="home"
       wallet={<WalletButton />}
       status={
-        <div className="watch-status-row">
-          {connected ? (
+        connected && isAdvanced ? (
+          <div className="watch-status-row">
             <StatusLine
               status={surfaceFreshness.freshness.kind}
               asOf={asOf}
               usdUnavailable={!usdAvailable}
             />
-          ) : (
-            <span />
-          )}
-          <TokenUsdSwitch
-            mode={usdMode}
-            tokenLabel={tokenLabel}
-            usdAvailable={usdAvailable}
-            onChange={(mode) => {
-              setUsdMode(mode);
-              if (account) storageSet(usdModeKey(chainId, account), mode);
-            }}
-          />
-        </div>
+            <TokenUsdSwitch
+              mode={usdMode}
+              tokenLabel={tokenLabel}
+              usdAvailable={usdAvailable}
+              onChange={(mode) => {
+                setUsdMode(mode);
+                if (account) storageSet(usdModeKey(chainId, account), mode);
+              }}
+            />
+          </div>
+        ) : undefined
       }
     >
       <div className="watch-milestone" aria-live="polite" />
-      {entry === "disconnected" ? <DisconnectedEntry /> : null}
       {entry === "unavailable" ? (
         <section data-region="entry-unavailable" aria-live="polite">
           <SurfaceState state="ERROR" topology="watch" />
@@ -728,37 +743,7 @@ export function WatchApp() {
           data-region="watch"
           data-narrow-detail={narrow && detailOpen && canLeaveDetail ? "true" : "false"}
         >
-          {showBack ? (
-            <button
-              type="button"
-              className="watch-back"
-              aria-label={`Back to ${resolvedLens}`}
-              onClick={() => {
-                backPendingRef.current = true;
-                url.deselect();
-              }}
-            >
-              ←
-            </button>
-          ) : null}
           <RegionErrorBoundary region="watch-wall">
-            <SurfaceState
-              state={defaultSurfaceState}
-              topology="watch"
-              onRefresh={
-                defaultSurfaceState === "STALE"
-                  ? () => {
-                      void streams.advancePin();
-                      void requestBook.advancePin();
-                      void queryClient.invalidateQueries({
-                        predicate: (query) =>
-                          query.queryKey[0] !== streamBookKeys.all[0] &&
-                          query.queryKey[0] !== requestBookKeys.all[0],
-                      });
-                    }
-                  : undefined
-              }
-            />
             {defaultBody}
           </RegionErrorBoundary>
         </div>
@@ -803,19 +788,6 @@ export function WatchApp() {
       ) : null}
       <Footer />
     </Shell>
-  );
-}
-
-function DisconnectedEntry() {
-  return (
-    <section className="watch-entry" data-ui="UI-WATCH-ENTRY-DISCONNECTED" data-region="entry-disconnected">
-      <p className="watch-kicker">ENTRY</p>
-      <p>
-        Once a wallet is connected, this home becomes Your OVRFLO: positions
-        you can watch.
-      </p>
-      <p>New position launches Self-Repaying Loans, Streams, and Fixed Returns from here. They do not require a book to start.</p>
-    </section>
   );
 }
 

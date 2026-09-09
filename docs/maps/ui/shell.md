@@ -11,16 +11,16 @@ U7 lands `Footer`. Wallet connect/disconnect is `WalletButton` from `wallet-runt
 
 **Purpose of the region.** Identify the application, connect a wallet, reach
 Your OVRFLO from the wordmark, open New position from the menu, expose Default /
-Advanced disclosure, and own every app-wide honesty surface: disconnected entry,
+Advanced disclosure, and own every app-wide honesty surface: wallet connect,
 syncing, status, route crashes, the write-path network gate, and the token/USD
 display switch. The shell holds no market figure of its own.
 
 **Boundary.** The watch surface, first-run, and every flow render *inside* the shell.
-Disconnected entry copy is this brief's (R12, reframed `ENTRY.DISCONNECTED`). Connected
-routing — watch vs first-run vs degraded Streams — is decided by `watch.md` and
-`first-run.md`; the shell only hosts the outcome. The SETTLEMENT trace and receipts
-belong to `review.md`. Do not add protocol metrics (TVL, aggregate rates, visitor
-counts) anywhere in this region.
+Disconnected home is Watch `UI-WATCH-EMPTY` in the `start` state plus
+`UI-SHELL-WALLET`. Connected routing — watch vs empty vs degraded Streams — is
+decided by `watch.md` and `first-run.md`; the shell only hosts the outcome. The
+SETTLEMENT trace and receipts belong to `review.md`. Do not add protocol metrics
+(TVL, aggregate rates, visitor counts) anywhere in this region.
 
 ---
 
@@ -103,8 +103,31 @@ counts) anywhere in this region.
   items.
 - **Copy rules.** Labels: `Your OVRFLO`, `New position`. Do not alternate
   Your OVRFLO with Portfolio. Do not show counts, badges, or "needs you"
-  markers on nav. Sentence case for the labels as written.
+  markers on nav. Sentence case for the labels as written. The New position
+  page heading is `Choose an OVRFLO`.
 - **Data authority.** `pure-client` — which route is open.
+
+## `UI-SHELL-BREADCRUMB`
+
+- **ID.** `UI-SHELL-BREADCRUMB`
+- **Purpose.** Return from a typed create flow, New position, a mixed-hub
+  collection, or a Default detail to the previous Your OVRFLO surface.
+- **Visible when.** `/create/` is open. `/borrow/`, `/supply/`, or
+  `/create/stream/` is open. A mixed hub opened a type collection. Default
+  detail is open and the wallet holds more than one position. Empty start and
+  confirmed-empty home do not mount this control.
+- **States.** One: rendered, with a destination label.
+- **Action.** `/create/` returns to `/`. A typed create flow returns to `/` when
+  empty start opened the flow, and to `/create/` when New position opened the
+  flow. A mixed-hub collection returns to `/`. Default loan detail returns to
+  `/?type=loan`. Default Fixed Return detail returns to `/?type=fixed`. Default
+  stream detail returns to `/?type=stream`. The wordmark remains `UI-SHELL-BRAND`.
+- **Copy rules.** Label is `Your OVRFLO` when the destination is empty start or
+  home. Label is `Choose an OVRFLO` when the destination is New position. Detail
+  labels are `Your loans`, `Your returns`, or `Your streams`. The New position
+  heading is `Choose an OVRFLO`. Do not say Choose a position type. The control
+  is a back arrow plus that label. Do not use `Close` or `Cancel`.
+- **Data authority.** `pure-client` — route and Default matrix.
 
 ## `UI-SHELL-MENU`
 
@@ -113,8 +136,8 @@ counts) anywhere in this region.
   compact layout opens the menu.
 - **Visible when.** Compact width (767px and below). The logo stays visible.
 - **States.** `closed`, `open`.
-- **Action.** Opens the menu. Links match `UI-SHELL-NAV`. The mode control
-  inside the menu is `UI-SHELL-MODE`.
+- **Action.** Opens the menu. Links match `UI-SHELL-NAV`. `UI-SHELL-MODE` appears
+  in the menu only when Advanced is already on.
 - **Copy rules.** Summary label `Menu`. Same destination labels as
   `UI-SHELL-NAV`.
 - **Data authority.** `pure-client`.
@@ -122,17 +145,16 @@ counts) anywhere in this region.
 ## `UI-SHELL-MODE`
 
 - **ID.** `UI-SHELL-MODE`
-- **Purpose.** Switch Default and Advanced disclosure over the current destination
-  without changing the path or query.
-- **Visible when.** Always. Desktop account navigation shows it. The mobile
-  menu repeats it. The hub help panel may duplicate `Go to Advanced`.
-- **States.** `default`, `advanced`. Refresh returns to `default`. Browser Back
-  does not toggle this control.
-- **Action.** `Go to Advanced` sets disclosure to Advanced. `Return to Default`
-  returns to Default. The current object or task stays on the same destination
-  URL. No query param is written.
-- **Copy rules.** `Go to Advanced` / `Return to Default`. Do not name Dashboard
-  or Markets. Do not describe Advanced as a second theme.
+- **Purpose.** Return from Advanced disclosure to Default without changing the
+  path or query.
+- **Visible when.** Advanced disclosure is on. Desktop account navigation shows
+  it. The mobile menu repeats it. Default chrome does not show `Go to Advanced`.
+- **States.** `advanced` only. Refresh returns to `default` and hides this
+  control. Browser Back does not toggle this control.
+- **Action.** `Return to Default` returns disclosure to Default. The current
+  object or task stays on the same destination URL. No query param is written.
+- **Copy rules.** `Return to Default`. Do not name Dashboard or Markets. Do not
+  describe Advanced as a second theme.
 - **Data authority.** `pure-client` — `chrome.disclosure`. Never on-chain.
 
 ## `UI-SHELL-NETWORK`
@@ -150,26 +172,24 @@ counts) anywhere in this region.
 ## `UI-SHELL-ENTRY-DISCONNECTED`
 
 - **ID.** `UI-SHELL-ENTRY-DISCONNECTED`
-- **Purpose.** Explain what home becomes once a wallet is connected, and offer
-  New position as the launch into Self-Repaying Loans, Streams, and Fixed
-  Returns, without pretending the visitor already has a book.
-- **Visible when.** No wallet is connected. This is the flow spec's `ENTRY.DISCONNECTED`
-  render, reframed to the watch-surface model (R12). It replaces the main surface; it
-  does not render on top of a watch wall.
+- **Purpose.** Keep `CONNECT WALLET` in chrome while Watch shows the three-type
+  start, without a separate copy block and without pretending the visitor
+  already has a book.
+- **Visible when.** No wallet is connected. Watch mounts `UI-WATCH-EMPTY` in
+  `start`. This control is the wallet chrome for that state, not a second body.
 - **States.** One: rendered. There is no loading, empty, or error variant — nothing
-  account-scoped has been asked yet. Connecting transitions out of this control into
-  `UI-SHELL-ENTRY-SYNCING`, then to watch or first-run per R12.
-- **Action.** `CONNECT WALLET` is `UI-SHELL-WALLET`. New position is
-  `UI-SHELL-NAV`. Connecting from this surface does not preserve a fictional
-  destination; R12 decides the landing.
-- **Copy rules.** One sentence each for what the home becomes (Your OVRFLO:
-  positions you can watch) and for New position as the launch into
-  Self-Repaying Loans, Streams, and Fixed Returns. No protocol metrics: no TVL,
-  no aggregate APR range, no visitor counts, no demonstration loan, no
-  synthetic instrument. Disconnected is not empty and not an error. Never say
-  "you have no positions". Never use health-factor or liquidation language to
-  explain why a visitor should connect.
-- **Data authority.** `pure-client` — static copy. No chain read backs this surface.
+  account-scoped has been asked yet. Connecting transitions into
+  `UI-SHELL-ENTRY-SYNCING`, then to watch or confirmed-empty per R12.
+- **Action.** `CONNECT WALLET` is `UI-SHELL-WALLET`. The three type cards are
+  Watch actions. Connecting does not preserve a fictional destination; R12
+  decides the landing.
+- **Copy rules.** No disconnected body copy. No protocol metrics: no TVL, no
+  aggregate APR range, no visitor counts, no demonstration loan, no synthetic
+  instrument. Disconnected is not a scanned empty book and not an error. Never
+  say "you have no positions". Never use health-factor or liquidation language
+  to explain why a visitor should connect.
+- **Data authority.** `pure-client` — wallet chrome. No chain read backs this
+  control.
 
 ## `UI-SHELL-ENTRY-SYNCING`
 
@@ -194,8 +214,9 @@ counts) anywhere in this region.
 - **ID.** `UI-SHELL-STATUS`
 - **Purpose.** Show event-read freshness for the whole app so a degraded RPC cannot
   silently freeze or invent values.
-- **Visible when.** A wallet is connected and at least one account-scoped read has been
-  attempted. Absent while disconnected.
+- **Visible when.** Advanced disclosure, after a wallet is connected and at least one
+  account-scoped read has been attempted. Default does not print this line. Signing
+  still disables when the last event read is stale.
 - **States.** Five, and they must stay distinguishable:
   - `synced` — last event read succeeded; caption `EVENTS AS OF <hh:mm:ss>`.
   - `reconnecting` — a read is retrying; schedule interpolation on watch keeps moving.
@@ -221,9 +242,9 @@ counts) anywhere in this region.
 - **ID.** `UI-SHELL-TOKEN-USD`
 - **Purpose.** Let the user switch whether amounts emphasize token units or a USD
   reference, without changing anything that would be signed.
-- **Visible when.** Always, once the shell has rendered. Disabled when USD is
-  unavailable (`UI-SHELL-STATUS` `usd-unavailable`).
-- **States.** `token` (default), `usd`, `disabled-unavailable` (`USD UNAVAILABLE`).
+- **Visible when.** An amount field is on screen and the USD feed is available. Absent
+  when the feed is unavailable. Token amounts stay. Do not print `USD UNAVAILABLE`.
+- **States.** `token` (default), `usd`.
 - **Action.** Client-side display mode only. It never changes calldata, allowances,
   receipts, or gates.
 - **Copy rules.** USD is a reference beside the token amount, never a replacement: the
@@ -233,7 +254,7 @@ counts) anywhere in this region.
   below $1,000, whole dollars above. The feed is stETH/USD × wstETH `stEthPerToken`;
   never assume stETH ≈ ETH.
 - **Data authority.** `pure-client` for the mode. `on-chain` for the feed answer and
-  its freshness. A missing or stale feed disables the switch; it does not print a
+  its freshness. A missing or stale feed omits the switch; it does not print a
   guessed dollar figure.
 
 ## `UI-SHELL-FOOTER`
@@ -367,10 +388,10 @@ counts) anywhere in this region.
 
 ## Region copy rules
 
-1. **Disconnected is a precondition, not empty and not an error.** One wording,
+1. **Disconnected is a precondition, not a scanned empty book and not an error.** One wording,
    `CONNECT WALLET`. No zeros, no red, no "you have no positions".
 2. **No protocol metrics on the shell.** TVL, aggregate rates, and visitor counts do
-   not appear on `ENTRY.DISCONNECTED` or in the masthead.
+   not appear on disconnected home or in the masthead.
 3. **Loading is never zero.** `CHECKING…` and bounded skeletons are not empty walls
    and not first-run.
 4. **USD is reference-only.** It never appears on a receipt's committed lines and

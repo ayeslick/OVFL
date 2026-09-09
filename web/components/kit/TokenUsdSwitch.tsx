@@ -15,23 +15,20 @@ export function TokenUsdSwitch({
   usdAvailable: boolean;
   onChange: (mode: TokenUsdMode) => void;
 }) {
-  const disabled = !usdAvailable;
+  if (!usdAvailable) return null;
   return (
     <button
       type="button"
       className="kit-switch"
-      disabled={disabled}
-      data-state={disabled ? "disabled-unavailable" : mode}
-      aria-label={disabled ? "USD UNAVAILABLE" : "Token or USD display"}
+      data-state={mode}
+      data-ui="UI-SHELL-TOKEN-USD"
+      aria-label="Token or USD display"
       onClick={() => {
-        if (disabled) return;
         onChange(mode === "token" ? "usd" : "token");
       }}
     >
-      <span data-on={mode === "token" && !disabled ? "true" : "false"}>{tokenLabel}</span>
-      <span data-on={mode === "usd" && !disabled ? "true" : "false"}>
-        {disabled ? "USD UNAVAILABLE" : "USD"}
-      </span>
+      <span data-on={mode === "token" ? "true" : "false"}>{tokenLabel}</span>
+      <span data-on={mode === "usd" ? "true" : "false"}>USD</span>
     </button>
   );
 }

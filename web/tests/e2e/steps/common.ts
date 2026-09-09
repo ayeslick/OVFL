@@ -138,9 +138,10 @@ When("I select the first available rate", async ({ page }) => {
 });
 
 When("I select the {string} lens", async ({ page }, label: string) => {
-  const goAdvanced = page.getByRole("button", { name: "Go to Advanced", exact: true });
-  if (await goAdvanced.count()) await goAdvanced.first().click();
-  await ui(page, "UI-WATCH-LENS").getByRole("tab", { name: label, exact: true }).click();
+  const tabs = ui(page, "UI-WATCH-LENS");
+  if (await tabs.count()) {
+    await tabs.getByRole("tab", { name: label, exact: true }).click();
+  }
 });
 
 When("I select the first loan row", async ({ page }) => {
@@ -208,7 +209,11 @@ Then("the watch write is closed", async ({ page }) => {
 });
 
 Then("I see the disconnected entry", async ({ page }) => {
-  await expect(ui(page, "UI-WATCH-ENTRY-DISCONNECTED")).toBeVisible();
+  await expect(page.getByRole("button", { name: "CONNECT WALLET", exact: true })).toBeVisible();
+  await expect(ui(page, "UI-WATCH-EMPTY")).toBeVisible();
+  await expect(page.getByRole("link", { name: /Self-Repaying Loan/i })).toBeVisible();
+  await expect(page.getByRole("link", { name: /Fixed Return/i })).toBeVisible();
+  await expect(page.getByRole("link", { name: /Create a stream/i })).toBeVisible();
 });
 
 Then("I see the first-run surface", async ({ page }) => {
@@ -310,15 +315,7 @@ Given("the viewport is {int} by {int}", async ({ page }, width: number, height: 
 });
 
 Then("Go to Advanced is reachable", async ({ page }) => {
-  const account = page.locator('[data-ui="UI-SHELL-MODE"][data-location="account"]');
-  if (await account.isVisible()) {
-    await expect(account).toHaveText(/Go to Advanced|Return to Default/);
-    return;
-  }
-  const menu = page.locator('[data-ui="UI-SHELL-MENU"]');
-  await expect(menu).toBeVisible();
-  await menu.locator("summary").click();
-  await expect(menu.getByRole("button", { name: /Go to Advanced|Return to Default/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Go to Advanced", exact: true })).toHaveCount(0);
 });
 
 Then("the page does not overflow horizontally", async ({ page }) => {

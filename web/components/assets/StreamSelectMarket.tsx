@@ -28,8 +28,7 @@ export function StreamSelectMarket({
 }) {
   return (
     <section data-ui="UI-ASSETS-STREAM-SELECT-MARKET" data-control="UI-ASSETS-STREAM-SELECT-MARKET" data-state={status}>
-      <span className="assets-bay-kicker">CREATE STREAM</span>
-      <h2 className="assets-bay-title">Choose a market</h2>
+      <h2 className="kit-surface-heading kit-flow-heading">Choose a market</h2>
       {status === "loading" ? <p className="assets-note">CHECKING MARKETS…</p> : null}
       {status === "unavailable" ? (
         <p className="assets-note" role="alert">
@@ -63,13 +62,7 @@ export function StreamSelectMarket({
         <div className="assets-actions">
           <ActionButton onClick={onContinue}>CONTINUE</ActionButton>
         </div>
-      ) : (
-        <div className="assets-actions">
-          <ActionButton disabled disabledReason="SELECT A MARKET">
-            CONTINUE
-          </ActionButton>
-        </div>
-      )}
+      ) : null}
     </section>
   );
 }

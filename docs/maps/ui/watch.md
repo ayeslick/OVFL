@@ -6,21 +6,23 @@
 hub / collection / detail / empty / incomplete from complete hydration.
 Advanced disclosure keeps the role wall (`Wall`, details).
 
-**Purpose of the region.** Home for a connected wallet. After full hydration
-completes, Your OVRFLO shows only the surface the count/type matrix
-justifies: empty plus a three-type chooser, one identity's detail, one type's
-collection, or a mixed hub. Wallet-held unpledged streams are a third Default
-type. Waiting requests stay in the loan group. Capsules show Remaining/Repaid
-from lending for loans, Releasing/Released from the stream schedule, and
-Arriving/Arrived/Claimed/Waiting from the filled position. Completed positions
-stay reachable. Actions live on the entities that own them. There is no
-aggregate attention strip.
+**Purpose of the region.** Home for Your OVRFLO. With no wallet, and after a
+connected empty book, home is the three-type start: Self-Repaying Loan,
+Stream, and Fixed Return. After full hydration finds holdings, Your OVRFLO
+shows only the surface the count/type matrix justifies: one identity's
+detail, one type's collection, or a mixed hub. Wallet-held unpledged streams
+are a third Default type. Waiting requests stay in the loan group. Capsules
+show Remaining/Repaid from lending for loans, Releasing/Released from the
+stream schedule, and Arriving/Arrived/Claimed/Waiting from the filled
+position. Completed positions stay reachable. Actions live on the entities
+that own them. There is no aggregate attention strip.
 
-**Boundary.** Disconnected entry is `UI-WATCH-ENTRY-DISCONNECTED`. Complete
-zero loans, zero Fixed Returns, and zero wallet-held streams plus a complete
-stream book is `UI-WATCH-EMPTY`, not first-run. Write checkpoints, SETTLEMENT
-trace, and receipts are `review.md`. Borrow / Supply / stream-create flows
-launch from New position (`/create/`) and from `UI-SHELL-NAV`.
+**Boundary.** No wallet mounts `UI-WATCH-EMPTY` as a start, not a scanned
+empty book. Complete zero loans, zero Fixed Returns, and zero wallet-held
+streams plus a complete stream book keeps `UI-WATCH-EMPTY`, not first-run.
+Write checkpoints, SETTLEMENT trace, and receipts are `review.md`. Borrow /
+Supply / stream-create flows launch from the three type cards, from New
+position (`/create/`), and from `UI-SHELL-NAV`.
 
 **Entry (R12 / KD16).** After connect: incomplete scan stays on
 `UI-WATCH-INCOMPLETE` and never writes matrix query params from a provisional
@@ -34,18 +36,27 @@ the loan group. Stream inventory density on Advanced stays on `/`.
 ## `UI-WATCH-EMPTY`
 
 - **ID.** `UI-WATCH-EMPTY`
-- **Purpose.** Show that complete hydration found zero Self-Repaying Loans, zero
-  Fixed Returns, and zero wallet-held streams, and send the user to New position.
-- **Visible when.** Connected, books complete, stream book complete and not unavailable, zero loans, zero supplies, zero wallet-held unpledged streams.
-- **States.** `ready` only. Incomplete and unavailable never share this representation.
-- **Action.** The three-type chooser opens `/borrow/`, `/create/stream/`, or
-  `/supply/`. A vis-hidden Create control still goes to `/create/`.
-- **Copy rules.** Say there are no positions yet. Name Self-Repaying Loan, Stream,
-  and Fixed Return. Do not teach first-run copy. Do not claim emptiness while
-  streams are still loading or unavailable. Do not list a pledged stream here.
-- **Data authority.** `on-chain` for loan, supply, and held-stream counts after
-  hydration. Stream completeness blocks empty when the stream book is loading or
-  unavailable. Waiting requests count as loans, not as empty.
+- **Purpose.** Let the user start a Self-Repaying Loan, a Stream, or a Fixed
+  Return when there is no wallet, or when a connected complete book has zero
+  loans, zero Fixed Returns, and zero wallet-held streams.
+- **Visible when.** No wallet is connected. Or: connected, books complete, stream
+  book complete and not unavailable, zero loans, zero supplies, zero wallet-held
+  unpledged streams.
+- **States.** `start` when no wallet is connected. `ready` when a connected
+  complete book is confirmed empty. Incomplete and unavailable never share this
+  representation.
+- **Action.** The three type cards open `/borrow/`, `/create/stream/`, or
+  `/supply/`. A vis-hidden Create control still goes to `/create/`. `CONNECT
+  WALLET` stays `UI-SHELL-WALLET`. Writes still require a connected wallet.
+- **Copy rules.** Title is `Your OVRFLO starts here.` Name Self-Repaying Loan,
+  Stream, and Fixed Return. Do not teach first-run copy. Do not say "you have
+  no positions". Do not claim emptiness while streams are still loading or
+  unavailable. Do not list a pledged stream here. Do not mount
+  `UI-SHELL-BREADCRUMB`.
+- **Data authority.** `pure-client` for the disconnected start. `on-chain` for
+  loan, supply, and held-stream counts after hydration. Stream completeness
+  blocks empty when the stream book is loading or unavailable. Waiting requests
+  count as loans, not as empty.
 
 ## `UI-WATCH-INCOMPLETE`
 
@@ -78,7 +89,7 @@ the loan group. Stream inventory density on Advanced stays on `/`.
 - **Purpose.** List every position of one type, including waiting and completed, with per-underlying totals and sort.
 - **Visible when.** Complete hydration found multiple positions of one type and none of the others, or the URL names that type on a mixed wallet. Advanced disclosure does not replace this on Default. Waiting requests list in the loan collection. Wallet-held unpledged streams list in the stream collection.
 - **States.** `ready` with all hydrated rows. Sort is `id` / `status` / `amount` and only reorders. Totals group by underlying and never sum unlike symbols.
-- **Action.** A row writes that identity and opens detail. Sort does not change counts or hide rows.
+- **Action.** A row writes that identity and opens detail. Sort does not change counts or hide rows. On a mixed hub, `UI-SHELL-BREADCRUMB` labeled `Your OVRFLO` returns to the hub.
 - **Copy rules.** Status stays meaningful (waiting, working, active, completed). Retired-market rows carry `retired market`.
 - **Data authority.** `on-chain` for rows. Sort is `pure-client` and is not a URL key.
 
@@ -256,7 +267,9 @@ the loan group. Stream inventory density on Advanced stays on `/`.
   `?loan=`, or `?stream=`, and opens the matching detail. Position and loan
   match both lending and id. Deselecting clears the entity params and keeps
   `?lens=`. Deep links select and scroll the row into view. Wide viewports open
-  detail in place; narrow viewports use `UI-WATCH-NARROW-NAV`.
+  detail in place; narrow viewports use `UI-WATCH-NARROW-NAV`. On Default, when
+  the wallet holds more than one position, `UI-SHELL-BREADCRUMB` returns to the
+  type collection.
 - **Copy rules.** None beyond the row's own copy. Do not add a "selected" badge that
   implies urgency.
 - **Data authority.** `pure-client` — URL and selection. The entity's facts remain
@@ -267,7 +280,8 @@ the loan group. Stream inventory density on Advanced stays on `/`.
 - **ID.** `UI-WATCH-NARROW-NAV`
 - **Purpose.** Below 1024px, treat the wall as a list screen and the detail as its
   own screen with a return affordance (KTD13).
-- **Visible when.** Viewport width is below 1024px and an entity is selected.
+- **Visible when.** Advanced disclosure is on, viewport width is below 1024px, and
+  an entity is selected. Default uses `UI-SHELL-BREADCRUMB` at every width.
 - **States.** `list` (no entity param), `detail` (entity param set).
 - **Action.** `←` clears the entity param (deselect) and returns to the wall. Browser
   Back does the same. On enter to detail, focus moves to the back control. URL still

@@ -14,7 +14,19 @@ import { useEffect, useState } from "react";
 // name, so a control that visibly reads "0x7099…79C8" would announce (and be
 // queryable as) something else entirely. `title` carries both the purpose and
 // the untruncated value as the description.
-export function CopyValue({ value, display, label }: { value: string; display: string; label?: string }) {
+export function CopyValue({
+  value,
+  display,
+  label,
+  className,
+  ui,
+}: {
+  value: string;
+  display: string;
+  label?: string;
+  className?: string;
+  ui?: string;
+}) {
   const [copied, setCopied] = useState(false);
 
   // Clear the acknowledgement on a timer, and cancel it on unmount so a card
@@ -38,7 +50,8 @@ export function CopyValue({ value, display, label }: { value: string; display: s
   return (
     <button
       type="button"
-      className="copy-value mono"
+      className={["copy-value", className ?? "mono"].join(" ")}
+      data-ui={ui}
       title={`${label ?? "Copy"}: ${value}`}
       onClick={copy}
     >

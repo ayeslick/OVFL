@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import { Shell } from "@/components/kit/Shell";
 import { StatusLine } from "@/components/kit/StatusLine";
+import { resetDisclosure, setDisclosure } from "@/lib/disclosure";
 import {
   isBackgroundRefetchFailure,
   setBackgroundRefetchFailed,
@@ -10,6 +11,7 @@ import {
 describe("freshness degraded and one refetch notice", () => {
   afterEach(() => {
     setBackgroundRefetchFailed(false);
+    resetDisclosure();
   });
 
   it("wires DEGRADED — SHOWING LAST KNOWN from the status line", () => {
@@ -34,6 +36,7 @@ describe("freshness degraded and one refetch notice", () => {
 
   it("surfaces one global notice rather than per-hook toasts", () => {
     setBackgroundRefetchFailed(true);
+    setDisclosure("advanced");
     render(
       <Shell currentNav="create" wallet="CONNECT" status={<StatusLine status="degraded" />}>
         body

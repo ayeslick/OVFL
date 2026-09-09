@@ -3,6 +3,7 @@
 import { useEffect, useRef, type ReactNode } from "react";
 import type { CreateChoices, CreateStage, StageVisibility } from "@/lib/create-stages";
 import { blockingCopy, visibleDecisionStages } from "@/lib/create-stages";
+import { KitIcon } from "@/components/kit/KitIcon";
 import { rememberOpener, restoreOpenerOrHeading } from "@/lib/surface-focus";
 import "./create-stage.css";
 
@@ -66,12 +67,13 @@ export function CreateStageFrame({
       {onBack ? (
         <button
           type="button"
-          className="create-stage-back"
+          className="kit-text-button kit-breadcrumb create-stage-back"
           onClick={() => {
             backPendingRef.current = true;
             onBack();
           }}
         >
+          <KitIcon name="back" />
           Back
         </button>
       ) : null}

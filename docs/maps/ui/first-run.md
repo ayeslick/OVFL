@@ -11,7 +11,7 @@ factual risk note at `/risk` and the one-time acknowledgment consumed by
 
 **Boundary.** This region does **not** render when stream discovery is pending or
 could-not-ask — that is `UI-WATCH-STREAMS-DEGRADED` (R12, AE5). Disconnected
-visitors see `UI-SHELL-ENTRY-DISCONNECTED`, not this teaching surface. Marketing
+visitors see Watch `UI-WATCH-EMPTY` in `start`, not this teaching surface. Marketing
 landing is out of scope. No demonstration loan, no synthetic instrument, no
 empty meter wall.
 
@@ -115,7 +115,7 @@ empty meter wall.
 
 - **ID.** `UI-FIRST-RUN-CHOOSER`
 - **Purpose.** After dismiss, offer the three Default position types as plain
-  launches — still not a watch wall, still not disconnected entry.
+  launches — still not a watch wall, still not the disconnected start.
 - **Visible when.** `UI-FIRST-RUN-SURFACE` is `chooser` (dismissed, still
   confirmed empty).
 - **States.** One: rendered.

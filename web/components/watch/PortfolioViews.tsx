@@ -8,13 +8,14 @@ import type { PortfolioType } from "@/lib/parse";
 import { formatTruncatedDecimal } from "@/lib/format";
 import { KD7_RETIRED_MARKET_COPY } from "@/lib/named-surface-state";
 import type { CollectionSort, UnderlyingTotal } from "@/lib/portfolio-status";
+import { KitBackLink } from "@/components/kit/KitBackLink";
 import { CreateChooser } from "@/components/kit/DefaultHub";
 import "@/components/kit/surfaces.css";
 
-export function PortfolioEmpty() {
+export function PortfolioEmpty({ state = "ready" }: { state?: "start" | "ready" }) {
   return (
-    <div data-ui="UI-WATCH-EMPTY">
-      <CreateChooser title="Your OVRFLO starts here." />
+    <div data-ui="UI-WATCH-EMPTY" data-state={state}>
+      <CreateChooser title="Your OVRFLO starts here." returnHref="/" />
       <a className="kit-vh" href="/create/" data-ui="UI-WATCH-EMPTY-CREATE">
         Create
       </a>
@@ -139,15 +140,26 @@ export function PortfolioCollection({
   cards,
   sort,
   onSort,
+  backHref,
+  backLabel,
+  onBack,
 }: {
   title: string;
   countLabel: string;
   cards: readonly CollectionCard[];
   sort?: CollectionSort;
   onSort?: (sort: CollectionSort) => void;
+  backHref?: string;
+  backLabel?: string;
+  onBack?: () => void;
 }) {
   return (
     <section data-ui="UI-WATCH-COLLECTION">
+      {backHref && backLabel ? (
+        <KitBackLink href={backHref} onClick={onBack}>
+          {backLabel}
+        </KitBackLink>
+      ) : null}
       <header className="kit-page-heading">
         <div>
           <SurfaceHeading>{title}</SurfaceHeading>

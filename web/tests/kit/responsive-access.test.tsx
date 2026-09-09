@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { fireEvent, render, screen, within } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import { afterEach, describe, expect, it } from "vitest";
 import { AddressChip } from "@/components/kit/AddressChip";
 import { AmountField } from "@/components/kit/AmountField";
 import { DefaultHub } from "@/components/kit/DefaultHub";
@@ -18,6 +18,7 @@ import { namedSurfaceSpec } from "@/lib/named-surface-state";
 import { YEAR_SECONDS } from "@/lib/lending-math";
 import type { Hex } from "viem";
 import { stubViewport } from "../inventory/fixtures";
+import { resetDisclosure, setDisclosure } from "@/lib/disclosure";
 
 const WEB_ROOT = process.cwd();
 const ADDRESS = "0x70997970C51812dc3A010C7d01b50e0d17dc79C8";
@@ -59,6 +60,9 @@ function headings(container: HTMLElement): string[] {
 }
 
 describe("CS4-U6 responsive access", () => {
+  afterEach(() => {
+    resetDisclosure();
+  });
   it("desktop and mobile captures keep the cool canvas, cards, and single compact surface", () => {
     const css = readFileSync(join(WEB_ROOT, "components/kit/kit.css"), "utf8");
     const globals = readFileSync(join(WEB_ROOT, "app/globals.css"), "utf8");
@@ -83,7 +87,7 @@ describe("CS4-U6 responsive access", () => {
     stubViewport(360);
     render(
       <Shell currentNav="create" wallet={<AddressChip address={ADDRESS} />}>
-        <DefaultHub welcome="Choose a position type" />
+        <DefaultHub welcome="Choose an OVRFLO" />
       </Shell>,
     );
     expect(document.querySelector(".default-hub-types")).not.toBeNull();
@@ -93,11 +97,11 @@ describe("CS4-U6 responsive access", () => {
   it("axe-shaped roles hold on create, hub, waiting, completed, and error", () => {
     const { container, rerender } = render(
       <Shell currentNav="create" wallet={<AddressChip address={ADDRESS} />}>
-        <DefaultHub welcome="Choose a position type" />
+        <DefaultHub welcome="Choose an OVRFLO" />
       </Shell>,
     );
     expect(headings(container)[0]).toBe("1:OVRFLO");
-    expect(headings(container)).toContain("2:Choose a position type");
+    expect(headings(container)).toContain("2:Choose an OVRFLO");
     expect(container.querySelectorAll("[aria-hidden='true'][data-identity]").length).toBeGreaterThan(0);
 
     rerender(
@@ -126,7 +130,7 @@ describe("CS4-U6 responsive access", () => {
     expect(css).toContain("outline: 3px solid var(--focus)");
     render(
       <Shell currentNav="create" wallet="CONNECT WALLET">
-        <DefaultHub welcome="Choose a position type" />
+        <DefaultHub welcome="Choose an OVRFLO" />
         <DisclosureRow id="fee" label="FEE FROM PROCEEDS" open={false} onToggle={() => undefined} />
         <RateWindow
           state="ready"
@@ -245,26 +249,29 @@ describe("CS4-U6 responsive access", () => {
     expect(chip).toHaveAccessibleDescription(`Copy wallet address: ${ADDRESS}`);
   });
 
-  it("hides decorative medallions from the accessibility tree", () => {
-    render(<DefaultHub welcome="Choose a position type" />);
-    const medallions = document.querySelectorAll(".kit-medallion");
-    expect(medallions.length).toBe(3);
-    for (const node of medallions) {
+  it("hides decorative type icons from the accessibility tree", () => {
+    render(<DefaultHub welcome="Choose an OVRFLO" />);
+    const icons = document.querySelectorAll(".kit-choice-icon");
+    expect(icons.length).toBe(3);
+    for (const node of icons) {
       expect(node).toHaveAttribute("aria-hidden", "true");
     }
   });
 
-  it("keeps Advanced on the shared tokens and exposes the mode switch at both widths", () => {
+  it("keeps Advanced on the shared tokens and hides Go to Advanced on Default", () => {
     stubViewport(1280);
     const { unmount } = render(
       <Shell currentNav="home" wallet="CONNECT WALLET">
-        <DefaultHub welcome="Choose a position type" />
+        <DefaultHub welcome="Choose an OVRFLO" />
       </Shell>,
     );
-    const account = document.querySelector('[data-ui="UI-SHELL-MODE"][data-location="account"]');
-    expect(account).toHaveTextContent("Go to Advanced");
-    fireEvent.click(account as HTMLElement);
+    expect(document.querySelector('[data-ui="UI-SHELL-MODE"][data-location="account"]')).toBeNull();
+    expect(screen.queryByRole("button", { name: "Go to Advanced" })).not.toBeInTheDocument();
+    act(() => {
+      setDisclosure("advanced");
+    });
     expect(document.querySelector("[data-ui='UI-SHELL']")).toHaveAttribute("data-disclosure", "advanced");
+    const account = document.querySelector('[data-ui="UI-SHELL-MODE"][data-location="account"]');
     expect(account).toHaveTextContent("Return to Default");
     expect(document.querySelector("[data-ui='UI-SHELL']")?.getAttribute("style")).toBeNull();
     unmount();
