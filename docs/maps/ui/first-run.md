@@ -73,7 +73,7 @@ empty meter wall.
 - **Visible when.** The guided surface is showing.
 - **States.** `enabled` (always as a path), `ready-balance` when PT `balanceOf` >
   0 (may be emphasized, not the only path).
-- **Action.** Routes to `UI-ASSETS-STREAM-SELECT-MARKET`.
+- **Action.** Routes to `/create/stream/` (`UI-ASSETS-STREAM-SELECT-MARKET`).
 - **Copy rules.** `I ALREADY HOLD PT → DEPOSIT`. No invented PT amount.
 - **Data authority.** `on-chain` for PT balance annotation. The route itself is
   always available; a zero PT balance is not a hidden path.
@@ -114,15 +114,16 @@ empty meter wall.
 ## `UI-FIRST-RUN-CHOOSER`
 
 - **ID.** `UI-FIRST-RUN-CHOOSER`
-- **Purpose.** After dismiss, offer the two Default position types as plain
+- **Purpose.** After dismiss, offer the three Default position types as plain
   launches — still not a watch wall, still not disconnected entry.
 - **Visible when.** `UI-FIRST-RUN-SURFACE` is `chooser` (dismissed, still
   confirmed empty).
 - **States.** One: rendered.
-- **Action.** Self-Repaying Loan goes to `/borrow/`. Fixed Return goes to
-  `/supply/`. These are typed create paths, not Default nav items.
-- **Copy rules.** `Self-Repaying Loan`, `Fixed Return`. No protocol metrics. No
-  demonstration instruments. Do not add Dashboard or Markets.
+- **Action.** Self-Repaying Loan goes to `/borrow/`. Stream goes to
+  `/create/stream/`. Fixed Return goes to `/supply/`. These are typed create
+  paths, not Default nav items.
+- **Copy rules.** `Self-Repaying Loan`, `Stream`, `Fixed Return`. No protocol
+  metrics. No demonstration instruments. Do not add Dashboard or Markets.
 - **Data authority.** `pure-client` layout. Emptiness still confirmed as for the
   surface.
 

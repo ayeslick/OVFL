@@ -95,7 +95,7 @@ describe.each(TRANSACTING_WIDTHS)("inventory — borrow topology at %ipx", (widt
   it("3 BORROW.SELECT_STREAM empty — guided handoff, no disabled form", () => {
     render(<NoStream />);
     expect(screen.getByText("Borrow needs a stream")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "CREATE A STREAM" })).toHaveAttribute("href", "/create");
+    expect(screen.getByRole("link", { name: "CREATE A STREAM" })).toHaveAttribute("href", "/create/stream/");
     expect(screen.queryByLabelText("BORROW AMOUNT")).not.toBeInTheDocument();
   });
 

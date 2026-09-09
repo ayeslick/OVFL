@@ -68,6 +68,21 @@ export function buildLoanCreateContext(args: {
   };
 }
 
+export function buildStreamCreateContext(args: {
+  markets: readonly MarketInfo[];
+  selectedUnderlying: string | null;
+  now: bigint;
+}): CreateStageContext {
+  const live = args.markets.filter((market) => nowLive(market, args.now));
+  return {
+    positionType: "stream",
+    sources: [],
+    underlyings: uniqueUnderlyings(live),
+    terms: termsForUnderlying(live, args.selectedUnderlying, args.now),
+    outcomes: [{ id: "deposit" }],
+  };
+}
+
 export function buildFixedCreateContext(args: {
   markets: readonly MarketInfo[];
   selectedUnderlying: string | null;

@@ -4,8 +4,8 @@ import { useState } from "react";
 import type { Address } from "viem";
 import { ActionButton } from "@/components/kit/ActionButton";
 import { Amount } from "@/components/kit/Amount";
-import { Ribbon } from "@/components/kit/Ribbon";
 import { RollingNumber } from "@/components/kit/RollingNumber";
+import { loanCapsuleSegments } from "@/lib/capsule-segments";
 import type { BorrowerLoanRow } from "@/hooks/useBorrowerBook";
 import { formatCoverDate, formatTruncatedDecimal } from "@/lib/format";
 import type { Freshness } from "@/lib/freshness";
@@ -14,15 +14,17 @@ import type { MarketInfo } from "@/lib/types";
 import {
   borrowedRowState,
   displayedOutstanding,
-  fraction01,
   loanCoverAt,
   loanOutstanding,
 } from "@/lib/watch-rows";
 import { freshnessCaption } from "./SuppliedDetail";
-import { SurfaceHeading } from "@/components/kit/SurfaceHeading";
-import { RetiredMarketMarker } from "./PortfolioViews";
+import { RetiredMarketMarker, DetailShell } from "./PortfolioViews";
 import { WatchWrite } from "./WatchWrite";
 import "./watch.css";
+
+function formatAmount(value: bigint): string {
+  return formatTruncatedDecimal(value, 18, 2);
+}
 
 export function BorrowedDetail({
   loan,
@@ -73,130 +75,103 @@ export function BorrowedDetail({
   });
   const coverAt = loanCoverAt(schedule, loanOutstanding(loan), nowSeconds);
   const stale = !signingAllowed;
-  const startMs = schedule ? Number(schedule.start) * 1000 : 0;
-  const endMs = coverAt ? Number(coverAt) * 1000 : schedule ? Number(schedule.end) * 1000 : nowMs;
-  const ribbonState = stale ? "degraded" : closeReady ? "recorded" : "edge";
-  const ratePerDay =
-    schedule && schedule.end > schedule.start
-      ? (schedule.deposited * 86_400n) / (schedule.end - schedule.start)
-      : 0n;
+  const status = closeReady ? "Active" : loan.outstanding === 0n ? "Completed" : "Active";
+  const segments = loanCapsuleSegments(
+    { obligation: loan.obligation, outstanding: loan.outstanding },
+    formatAmount,
+  );
 
   return (
     <article data-ui="UI-WATCH-BORROWED-DETAIL" data-region="borrowed-detail" data-state={state}>
-      <SurfaceHeading>Self-Repaying Loan</SurfaceHeading>
       {retired ? <RetiredMarketMarker /> : null}
-      <div className="kit-hero">
-        <span className="kit-hero-kicker">OUTSTANDING</span>
-        <RollingNumber
-          value={outstanding}
-          schedule={
-            schedule && !closeReady
-              ? {
-                  startMs: Number(lastReadAt) * 1000,
-                  endMs,
-                  startAmount: loan.outstanding,
-                  endAmount: 0n,
+      <DetailShell
+        title="Self-Repaying Loan"
+        status={status}
+        segments={segments}
+        facts={[
+          { label: "Remaining", value: `${formatAmount(loan.outstanding)} ${symbol}` },
+          { label: "Repaid", value: `${formatAmount(loan.obligation - loan.outstanding)} ${symbol}` },
+          { label: "Net proceeds", value: `${formatTruncatedDecimal(loan.drawn, 18, 5)} ${symbol}` },
+          { label: "Obligation", value: `${formatTruncatedDecimal(loan.obligation, 18, 5)} ${symbol}` },
+          { label: "Pledged stream", value: `#${loan.streamId.toString()}` },
+          {
+            label: "Done date",
+            value: !schedule ? "Checking…" : coverAt ? formatCoverDate(coverAt) : "Uncovered",
+          },
+        ]}
+        note={freshnessCaption(freshness)}
+        actions={
+          write && lending && market ? (
+            <WatchWrite
+              kind={write}
+              lending={lending}
+              market={market}
+              loanId={loan.id}
+              outstanding={loan.outstanding}
+              withdrawable={withdrawable}
+              symbol={symbol}
+              underlyingSymbol={underlyingSymbol}
+              signingAllowed={signingAllowed}
+              schedule={schedule}
+              nowSeconds={nowSeconds}
+              onClose={() => setWrite(null)}
+            />
+          ) : (
+            <>
+              <RollingNumber
+                value={outstanding}
+                schedule={
+                  schedule && !closeReady
+                    ? {
+                        startMs: Number(lastReadAt) * 1000,
+                        endMs: coverAt
+                          ? Number(coverAt) * 1000
+                          : Number(schedule.end) * 1000,
+                        startAmount: loan.outstanding,
+                        endAmount: 0n,
+                      }
+                    : undefined
                 }
-              : undefined
-          }
-          ticking={!closeReady}
-          nowMs={nowMs}
-          displayDecimals={8}
-        />
-        {usdMode === "usd" ? (
-          <Amount
-            token={formatTruncatedDecimal(outstanding, 18, 8)}
-            symbol={symbol}
-            usd={usdText}
-            usdAvailable={usdAvailable}
-            mode="usd"
-          />
-        ) : (
-          <span className="watch-hero-meta">
-            {symbol}
-            {coverAt ? ` · ${formatCoverDate(coverAt).toUpperCase()}` : ""}
-            {ratePerDay > 0n ? ` · −${formatTruncatedDecimal(ratePerDay, 18, 5)} / DAY` : ""}
-          </span>
-        )}
-      </div>
-
-      {write && lending && market ? (
-        <WatchWrite
-          kind={write}
-          lending={lending}
-          market={market}
-          loanId={loan.id}
-          outstanding={loan.outstanding}
-          withdrawable={withdrawable}
-          symbol={symbol}
-          underlyingSymbol={underlyingSymbol}
-          signingAllowed={signingAllowed}
-          schedule={schedule}
-          nowSeconds={nowSeconds}
-          onClose={() => setWrite(null)}
-        />
-      ) : (
-        <div className="watch-actions">
-          {loan.outstanding > 0n ? (
-            stale ? (
-              <ActionButton disabled disabledReason="EVENTS STALE — SIGNING DISABLED">
-                REPAY
-              </ActionButton>
-            ) : (
-              <ActionButton onClick={() => setWrite("repay")}>REPAY</ActionButton>
-            )
-          ) : null}
-          {closeReady ? (
-            stale ? (
-              <ActionButton disabled disabledReason="EVENTS STALE — SIGNING DISABLED">
-                CLOSE FROM STREAM
-              </ActionButton>
-            ) : (
-              <ActionButton variant="primary" onClick={() => setWrite("close")}>
-                CLOSE FROM STREAM
-              </ActionButton>
-            )
-          ) : null}
-        </div>
-      )}
-
-      <Ribbon
-        state={ribbonState}
-        startMs={startMs}
-        endMs={endMs}
-        nowMs={nowMs}
-        progress={closeReady ? 1 : fraction01(loan.drawn + loan.repaid, loan.obligation)}
-        valueText={`${formatTruncatedDecimal(outstanding, 18, 8)} ${symbol} outstanding`}
-        originLabel="OPENED"
-        terminalLabel={coverAt ? formatCoverDate(coverAt).toUpperCase() : "TERMINAL"}
+                ticking={!closeReady}
+                nowMs={nowMs}
+                displayDecimals={8}
+              />
+              {usdMode === "usd" ? (
+                <Amount
+                  token={formatTruncatedDecimal(outstanding, 18, 8)}
+                  symbol={symbol}
+                  usd={usdText}
+                  usdAvailable={usdAvailable}
+                  mode="usd"
+                />
+              ) : null}
+              {loan.outstanding > 0n ? (
+                stale ? (
+                  <ActionButton disabled disabledReason="EVENTS STALE — SIGNING DISABLED">
+                    REPAY
+                  </ActionButton>
+                ) : (
+                  <ActionButton onClick={() => setWrite("repay")}>REPAY</ActionButton>
+                )
+              ) : null}
+              {closeReady ? (
+                stale ? (
+                  <ActionButton disabled disabledReason="EVENTS STALE — SIGNING DISABLED">
+                    CLOSE FROM STREAM
+                  </ActionButton>
+                ) : (
+                  <ActionButton variant="primary" onClick={() => setWrite("close")}>
+                    CLOSE FROM STREAM
+                  </ActionButton>
+                )
+              ) : null}
+              <button type="button" className="kit-text-button" onClick={() => onSelectStream(loan.streamId)}>
+                View stream #{loan.streamId.toString()}
+              </button>
+            </>
+          )
+        }
       />
-
-      <dl className="watch-facts">
-        <Fact label="NET PROCEEDS" value={`${formatTruncatedDecimal(loan.drawn, 18, 5)} ${symbol}`} />
-        <Fact label="OBLIGATION" value={`${formatTruncatedDecimal(loan.obligation, 18, 5)} ${symbol}`} />
-        <Fact label="RECOVERED" value={`${formatTruncatedDecimal(loan.drawn + loan.repaid, 18, 5)} ${symbol}`} />
-        <Fact label="OUTSTANDING" value={`${formatTruncatedDecimal(outstanding, 18, 5)} ${symbol}`} />
-        <Fact label="PLEDGED STREAM" value={`#${loan.streamId.toString()}`} />
-        <Fact
-          label="DONE DATE"
-          value={
-            !schedule ? "CHECKING…" : coverAt ? formatCoverDate(coverAt).toUpperCase() : "UNCOVERED"
-          }
-        />
-      </dl>
-      <p className="watch-freshness">{freshnessCaption(freshness)}</p>
-      <button type="button" className="watch-back" onClick={() => onSelectStream(loan.streamId)}>
-        STREAM #{loan.streamId.toString()}
-      </button>
     </article>
-  );
-}
-
-function Fact({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="watch-fact">
-      <dt>{label}</dt>
-      <dd>{value}</dd>
-    </div>
   );
 }

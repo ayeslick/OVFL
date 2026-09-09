@@ -38,16 +38,16 @@ export const metadata: Metadata = {
 
 const DIRECTION_CONTRACT = `<!--
 THESIS: A calm path through one economic choice at a time — exact consequences before signing.
-OWN-WORLD: Cool near-white canvas, white bordered cards, deep navy text, cobalt actions; Schibsted Grotesk; Default and Advanced share one token system.
-STORY: Default home is Your OVRFLO. Create is the other destination. Advanced is disclosure, not a second home.
-FIRST VIEWPORT: Your OVRFLO and Create. Wallet and network stay secondary.
-FINISH: DESIGN.md is normative; boards are acceptance evidence.
+OWN-WORLD: White canvas, 28px cards, pill actions, navy ink, cobalt primary; Arial; SVG capsules; Default and Advanced share one token system.
+STORY: Default home is Your OVRFLO. The header has no destination tabs. Create is a flow. Advanced is disclosure, not a second home.
+FIRST VIEWPORT: Logo wordmark and wallet. Empty home is the three-type chooser.
+FINISH: DESIGN.md is normative; the approved UI zip is acceptance evidence for pixels.
 -->`;
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en" className={`${schibstedGrotesk.variable} ${martianMono.variable}`}>
-      <body className={schibstedGrotesk.className}>
+      <body>
         <span hidden dangerouslySetInnerHTML={{ __html: DIRECTION_CONTRACT }} />
         <Providers>{children}</Providers>
       </body>

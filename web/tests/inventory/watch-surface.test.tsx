@@ -36,7 +36,7 @@ describe("inventory — entry, lenses, watch index, first-run, degraded, narrow 
     expect(screen.getByRole("button", { name: "CONNECT WALLET" })).toBeInTheDocument();
     const nav = document.querySelector('[data-ui="UI-SHELL-NAV"]');
     expect(nav?.textContent).toContain("Your OVRFLO");
-    expect(nav?.textContent).toContain("Create");
+    expect(nav?.textContent).toContain("New position");
     expect(nav?.textContent).not.toContain("Activity");
     expect(screen.getByText(/Your OVRFLO: positions/i)).toBeInTheDocument();
     expect(document.querySelector("[data-ui='UI-WATCH-ENTRY-DISCONNECTED']")).not.toBeNull();
@@ -202,7 +202,7 @@ describe("inventory — entry, lenses, watch index, first-run, degraded, narrow 
     expect(screen.getByRole("article")).toHaveAttribute("data-region", "borrowed-detail");
     expect(screen.getByRole("button", { name: "REPAY" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "CLOSE FROM STREAM" })).not.toBeInTheDocument();
-    expect(screen.getByText("DONE DATE")).toBeInTheDocument();
+    expect(screen.getByText("Done date")).toBeInTheDocument();
     expect(screen.queryByText(/health factor/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/liquidat/i)).not.toBeInTheDocument();
   });
@@ -213,8 +213,8 @@ describe("inventory — entry, lenses, watch index, first-run, degraded, narrow 
     fx.loanStreams = new Map();
     writeWatchSearch({ lens: "borrowed", selection: { kind: "loan", lending: LENDING, id: 12n } }, "replace");
     render(<WatchApp />);
-    expect(screen.getByText("DONE DATE")).toBeInTheDocument();
-    expect(screen.getByText("CHECKING…")).toBeInTheDocument();
+    expect(screen.getByText("Done date")).toBeInTheDocument();
+    expect(screen.getByText("Checking…")).toBeInTheDocument();
   });
 
   it("17 POSITIONS.INDEX + STREAM_DETAIL — BORROW AGAINST THIS STREAM when eligible", () => {

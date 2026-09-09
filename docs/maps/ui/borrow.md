@@ -57,8 +57,9 @@ SIGN → PENDING → CONFIRMED`.
 - **Visible when.** Stream list is confirmed empty of eligible unpledged streams.
 - **States.** One: `empty-eligible`. Distinct from `unavailable` on
   `UI-BORROW-SELECT-STREAM`.
-- **Action.** Routes into stream creation (`UI-ASSETS-STREAM-SELECT-MARKET`) or
-  first-run's deposit intent when the wallet is otherwise protocol-empty.
+- **Action.** Routes into stream creation at `/create/stream/`
+  (`UI-ASSETS-STREAM-SELECT-MARKET`) or first-run's deposit intent when the
+  wallet is otherwise protocol-empty.
 - **Copy rules.** Borrow requires an eligible, transferable OVRFLO-created Sablier
   stream. Do not show a greyed amount field. Do not invent a demonstration stream.
 - **Data authority.** `on-chain` for the confirmed-empty hydration result.

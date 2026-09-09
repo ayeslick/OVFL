@@ -7,6 +7,7 @@ import { useConnection, usePublicClient, useReadContracts } from "wagmi";
 import { isAddressEqual, parseEventLogs, type Address, type Log } from "viem";
 import { WalletButton } from "wallet-runtime";
 import { CreateStageFrame } from "@/components/create/CreateStageFrame";
+import { FlowLayout } from "@/components/kit/FlowLayout";
 import { compileCreateIntent } from "@/lib/create-intent";
 import {
   autoFillChoices,
@@ -59,7 +60,8 @@ import { buildAuthStepPlan, rebuildProtocolGraphStep, reuseOrAllocateGraphId } f
 import { defaultRecoveryCopy, type RecoveryCopy } from "@/lib/recovery-copy";
 import { listStepEvidence, readCurrentAttempt, writeCurrentAttempt } from "@/lib/step-evidence";
 import { decodeContractError, isUserRejection } from "@/lib/errors";
-import { formatUsd } from "@/lib/format";
+import { formatTruncatedDecimal, formatUsd } from "@/lib/format";
+import { fixedCapsuleSegments } from "@/lib/capsule-segments";
 import { stepWindow, tickWindow, type LadderModel } from "@/lib/ladder";
 import { MIN_LIQUIDITY_AMOUNT, UNIT, unitsToWei } from "@/lib/lending-math";
 import { parseDecimalInput } from "@/lib/parse";
@@ -719,6 +721,18 @@ export function SupplyFlow() {
     error: Boolean(decoded && !isUserRejection(actionTx.error) && !isUserRejection(approveTx.error)),
   });
 
+  const supplyAmount = frozen?.amount ?? (parsedAmount.ok ? parsedAmount.value : 0n);
+  const supplySegments = fixedCapsuleSegments(
+    {
+      unmatched: supplyAmount,
+      supplied: supplyAmount,
+      arriving: 0n,
+      arrived: 0n,
+      claimed: 0n,
+    },
+    (value) => formatTruncatedDecimal(value, 18, 2),
+  );
+
   return (
     <Shell
       currentNav="create"
@@ -753,6 +767,7 @@ export function SupplyFlow() {
             </div>
           ) : null}
           {connected && !walletReset.walletChanged ? (
+            <FlowLayout compact={compact} segments={supplySegments}>
             <CreateStageFrame
               stage={stage}
               visibility={visibility}
@@ -971,6 +986,7 @@ export function SupplyFlow() {
             </>
           ) : null}
             </CreateStageFrame>
+            </FlowLayout>
           ) : null}
         </div>
       </ModalErrorBoundary>

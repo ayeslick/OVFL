@@ -66,7 +66,7 @@ describe("guided first run (AE5)", () => {
     expect(link).toHaveAttribute("rel", "noopener noreferrer");
     expect(link).toHaveAttribute("target", "_blank");
     expect(link).toHaveTextContent(/external/i);
-    expect(screen.getByRole("link", { name: /I ALREADY HOLD PT/i })).toHaveAttribute("href", "/create");
+    expect(screen.getByRole("link", { name: /I ALREADY HOLD PT/i })).toHaveAttribute("href", "/create/stream/");
   });
 
   it("degrades a rotten Pendle URL to naming the series, not a fake button", () => {
@@ -179,6 +179,7 @@ describe("guided first run (AE5)", () => {
     unmount();
     render(<Chooser />);
     expect(screen.getByRole("link", { name: "Self-Repaying Loan" })).toHaveAttribute("href", "/borrow/");
+    expect(screen.getByRole("link", { name: "Stream" })).toHaveAttribute("href", "/create/stream/");
     expect(screen.getByRole("link", { name: "Fixed Return" })).toHaveAttribute("href", "/supply/");
     expect(screen.queryByRole("link", { name: "ASSETS" })).not.toBeInTheDocument();
     expect(screen.queryByText(TEACHING_SENTENCES[0])).not.toBeInTheDocument();

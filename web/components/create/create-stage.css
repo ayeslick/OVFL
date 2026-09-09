@@ -1,6 +1,6 @@
 .create-stage {
   display: grid;
-  gap: var(--space-lg, 24px);
+  gap: var(--space-lg);
 }
 
 .create-stage-progress {
@@ -25,14 +25,14 @@
   display: grid;
   gap: 2px;
   min-width: 8rem;
-  padding: 8px 12px;
-  border: 1px solid var(--border, #d9e2ef);
-  border-radius: 10px;
-  background: var(--surface, #fff);
+  padding: 10px 15px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
 }
 
 .create-stage-summary span {
-  color: var(--muted, #627187);
+  color: var(--muted);
   font-size: 12px;
 }
 
@@ -42,7 +42,7 @@
 }
 
 .create-stage-heading:focus-visible {
-  box-shadow: 0 0 0 2px var(--focus, #2563eb);
+  box-shadow: 0 0 0 3px var(--focus);
 }
 
 .create-stage-back {
@@ -51,14 +51,14 @@
   padding: 0 12px;
   border: none;
   background: transparent;
-  color: var(--ink, #0b1f3a);
+  color: var(--ink);
   text-decoration: underline;
 }
 
 .create-stage-block {
   margin: 0;
   padding: 16px;
-  border: 1px solid var(--border, #d9e2ef);
-  border-radius: 16px;
-  background: var(--warning-soft, #fff4df);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--warning-soft);
 }

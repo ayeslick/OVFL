@@ -91,6 +91,33 @@ describe("create intent compiler", () => {
     expect(first.intent).toEqual(second.intent);
   });
 
+  it("compiles stream create as a deposit of the entered amount", () => {
+    const streamContext: CreateStageContext = {
+      positionType: "stream",
+      sources: [],
+      underlyings: [{ id: "wsteth" }],
+      terms: [{ id: "2027-03" }],
+      outcomes: [{ id: "deposit" }],
+    };
+    const def = compileCreateIntent({
+      positionType: "stream",
+      disclosure: "default",
+      context: streamContext,
+      choices: emptyChoices(),
+      amount: "3",
+    });
+    const adv = compileCreateIntent({
+      positionType: "stream",
+      disclosure: "advanced",
+      context: streamContext,
+      choices: emptyChoices(),
+      amount: "3",
+    });
+    expect(def).toEqual({ type: "deposit", amount: "3" });
+    expect(createIntentsMatch(def, adv)).toBe(true);
+    expect(intentHasForbiddenFields(def)).toBe(false);
+  });
+
   it("keeps the token-native amount when USD display mode stays off the intent", () => {
     const intent = compileCreateIntent({
       positionType: "loan",

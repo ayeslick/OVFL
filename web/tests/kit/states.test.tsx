@@ -27,7 +27,7 @@ describe("kit labels, roles, and state classes", () => {
       "aria-current",
       "page",
     );
-    expect(within(nav as HTMLElement).getByRole("link", { name: "Create" })).toHaveAttribute(
+    expect(within(nav as HTMLElement).getByRole("link", { name: "New position" })).toHaveAttribute(
       "href",
       "/create/",
     );

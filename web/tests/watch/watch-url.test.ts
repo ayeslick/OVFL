@@ -30,6 +30,7 @@ describe("watch URL", () => {
   it("writes type only when selection is none", () => {
     expect(serializeWatchSearch({ type: "loan", selection: { kind: "none" } })).toBe("?type=loan");
     expect(serializeWatchSearch({ type: "fixed", selection: { kind: "none" } })).toBe("?type=fixed");
+    expect(serializeWatchSearch({ type: "stream", selection: { kind: "none" } })).toBe("?type=stream");
     expect(
       serializeWatchSearch({
         type: "loan",

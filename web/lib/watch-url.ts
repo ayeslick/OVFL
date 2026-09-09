@@ -86,7 +86,7 @@ export function serializeWatchSearch(state: {
     params.set("loan", selection.id.toString());
   } else if (selection.kind === "stream") {
     params.set("stream", selection.id.toString());
-  } else if (state.type === "loan" || state.type === "fixed") {
+  } else if (state.type === "loan" || state.type === "fixed" || state.type === "stream") {
     params.set("type", state.type);
   }
   const query = params.toString();

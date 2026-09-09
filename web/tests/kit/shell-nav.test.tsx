@@ -25,13 +25,13 @@ describe("CS4-U1 Default shell navigation", () => {
     resetDisclosure();
   });
 
-  it("renders Your OVRFLO and Create in desktop nav and the mobile menu", () => {
+  it("renders Your OVRFLO and New position in the menu", () => {
     render(
       <Shell currentNav="home" wallet="CONNECT WALLET" network="Ethereum">
         body
       </Shell>,
     );
-    const labels = ["Your OVRFLO", "Create"];
+    const labels = ["Your OVRFLO", "New position"];
     for (const label of labels) {
       expect(desktopNav().getByRole("link", { name: label })).toBeInTheDocument();
     }
@@ -41,7 +41,7 @@ describe("CS4-U1 Default shell navigation", () => {
       expect(within(menu as HTMLElement).getByRole("link", { name: label })).toBeInTheDocument();
     }
     expect(desktopNav().getByRole("link", { name: "Your OVRFLO" })).toHaveAttribute("href", "/");
-    expect(desktopNav().getByRole("link", { name: "Create" })).toHaveAttribute("href", "/create/");
+    expect(desktopNav().getByRole("link", { name: "New position" })).toHaveAttribute("href", "/create/");
     expect(desktopNav().queryByRole("link", { name: "Activity" })).not.toBeInTheDocument();
   });
 
@@ -113,16 +113,17 @@ describe("CS4-U1 hub layout and create chooser", () => {
     const css = readFileSync(join(WEB_ROOT, "components/kit/kit.css"), "utf8");
     expect(css).toMatch(/@media \(min-width: 1024px\)/);
     expect(css).toMatch(/\.default-hub-welcome\s*\{\s*grid-column:\s*1\s*\/\s*-1;/);
-    expect(css).toMatch(/\.default-hub-types\s*\{\s*grid-template-columns:\s*1fr 1fr;/);
+    expect(css).toMatch(/\.default-hub-types\s*\{\s*grid-template-columns:\s*1fr 1fr 1fr;/);
     expect(css).not.toMatch(/\.default-hub-lower\s*\{\s*grid-template-columns:\s*2fr 1fr;/);
     expect(css).toMatch(/@media \(max-width: 767px\)/);
     expect(css).toMatch(/\.kit-nav\s*\{\s*display:\s*none;/);
   });
 
-  it("offers Self-Repaying Loan and Fixed Return on the create chooser", () => {
-    render(<DefaultHub welcome="Choose a position type" />);
-    expect(screen.getByRole("link", { name: /Self-Repaying Loan/ })).toHaveAttribute("href", "/borrow/");
-    expect(screen.getByRole("link", { name: /Fixed Return/ })).toHaveAttribute("href", "/supply/");
+  it("offers Self-Repaying Loan, Fixed Return, and Stream on the create chooser", () => {
+    const { container } = render(<DefaultHub welcome="Choose a position type" />);
+    expect(container.querySelector("[data-type=loan]")).toHaveAttribute("href", "/borrow/");
+    expect(container.querySelector("[data-type=fixed]")).toHaveAttribute("href", "/supply/");
+    expect(container.querySelector("[data-type=stream]")).toHaveAttribute("href", "/create/stream/");
     expect(screen.queryByRole("link", { name: "Open Activity" })).not.toBeInTheDocument();
   });
 });

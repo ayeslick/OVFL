@@ -6,7 +6,7 @@ export type ParseErr = { ok: false; reason: "malformed" | "empty" | "negative" |
 export type ParseResult<T> = ParseOk<T> | ParseErr;
 
 export type WatchLens = "supplied" | "borrowed" | "streams";
-export type PortfolioType = "loan" | "fixed";
+export type PortfolioType = "loan" | "fixed" | "stream";
 export type UsdMode = "token" | "usd";
 
 export type WatchSearch = {
@@ -27,7 +27,7 @@ export type FlowDraft = {
 
 const BIGINT_TAG = "$ovrflo/bigint";
 const LENSES = new Set<WatchLens>(["supplied", "borrowed", "streams"]);
-const PORTFOLIO_TYPES = new Set<PortfolioType>(["loan", "fixed"]);
+const PORTFOLIO_TYPES = new Set<PortfolioType>(["loan", "fixed", "stream"]);
 const USD_MODES = new Set<UsdMode>(["token", "usd"]);
 
 function ok<T>(value: T): ParseOk<T> {

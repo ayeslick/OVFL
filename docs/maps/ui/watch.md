@@ -8,34 +8,44 @@ Advanced disclosure keeps the role wall (`Wall`, details).
 
 **Purpose of the region.** Home for a connected wallet. After full hydration
 completes, Your OVRFLO shows only the surface the count/type matrix
-justifies: empty plus Create, one identity's detail, one type's collection,
-or a mixed hub. Waiting and completed positions stay reachable.
-Actions live on the entities that own them. There is no aggregate attention
-strip.
+justifies: empty plus a three-type chooser, one identity's detail, one type's
+collection, or a mixed hub. Wallet-held unpledged streams are a third Default
+type. Waiting requests stay in the loan group. Capsules show Remaining/Repaid
+from lending for loans, Releasing/Released from the stream schedule, and
+Arriving/Arrived/Claimed/Waiting from the filled position. Completed positions
+stay reachable. Actions live on the entities that own them. There is no
+aggregate attention strip.
 
 **Boundary.** Disconnected entry is `UI-WATCH-ENTRY-DISCONNECTED`. Complete
-zero loans and Fixed Returns plus a complete stream book is `UI-WATCH-EMPTY`,
-not first-run. Write checkpoints, SETTLEMENT trace, and receipts are
-`review.md`. Borrow / Supply / Assets flows launch from Create and from
-`UI-SHELL-NAV`.
+zero loans, zero Fixed Returns, and zero wallet-held streams plus a complete
+stream book is `UI-WATCH-EMPTY`, not first-run. Write checkpoints, SETTLEMENT
+trace, and receipts are `review.md`. Borrow / Supply / stream-create flows
+launch from New position (`/create/`) and from `UI-SHELL-NAV`.
 
 **Entry (R12 / KD16).** After connect: incomplete scan stays on
 `UI-WATCH-INCOMPLETE` and never writes matrix query params from a provisional
 count. Complete hydration on `/` writes the KD16 URL. A stale identity is
-stripped, then the matrix applies. Stream inventory stays Advanced density on
-`/`.
+stripped, then the matrix applies. Wallet-held unpledged streams join the
+Default matrix. Pledged streams stay on the loan. Waiting requests stay in
+the loan group. Stream inventory density on Advanced stays on `/`.
 
 ---
 
 ## `UI-WATCH-EMPTY`
 
 - **ID.** `UI-WATCH-EMPTY`
-- **Purpose.** Show that complete hydration found zero Self-Repaying Loans and zero Fixed Returns, and send the user to Create.
-- **Visible when.** Connected, books complete, stream book complete and not unavailable, zero loans, zero supplies.
+- **Purpose.** Show that complete hydration found zero Self-Repaying Loans, zero
+  Fixed Returns, and zero wallet-held streams, and send the user to New position.
+- **Visible when.** Connected, books complete, stream book complete and not unavailable, zero loans, zero supplies, zero wallet-held unpledged streams.
 - **States.** `ready` only. Incomplete and unavailable never share this representation.
-- **Action.** Create goes to `/create/`.
-- **Copy rules.** Say there are no positions yet. Name Create. Do not teach first-run copy. Do not claim emptiness while streams are still loading or unavailable.
-- **Data authority.** `on-chain` for loan and supply counts after hydration. Stream completeness blocks empty when the stream book is loading or unavailable.
+- **Action.** The three-type chooser opens `/borrow/`, `/create/stream/`, or
+  `/supply/`. A vis-hidden Create control still goes to `/create/`.
+- **Copy rules.** Say there are no positions yet. Name Self-Repaying Loan, Stream,
+  and Fixed Return. Do not teach first-run copy. Do not claim emptiness while
+  streams are still loading or unavailable. Do not list a pledged stream here.
+- **Data authority.** `on-chain` for loan, supply, and held-stream counts after
+  hydration. Stream completeness blocks empty when the stream book is loading or
+  unavailable. Waiting requests count as loans, not as empty.
 
 ## `UI-WATCH-INCOMPLETE`
 
@@ -51,17 +61,22 @@ stripped, then the matrix applies. Stream inventory stays Advanced density on
 
 - **ID.** `UI-WATCH-HUB`
 - **Purpose.** Let a mixed-type wallet open one collection per type.
-- **Visible when.** Complete hydration found at least one loan and at least one Fixed Return, and the URL names neither a type collection nor an owned identity.
-- **States.** `ready`. One card per type with that type's hydrated count.
-- **Action.** View all writes `?type=loan` or `?type=fixed` and opens that collection.
-- **Copy rules.** Type names are Self-Repaying Loans and Fixed Returns. Show the count. Do not sum unlike symbols on the cards.
+- **Visible when.** Complete hydration found at least two of loan, Fixed Return,
+  and wallet-held stream, and the URL names neither a type collection nor an
+  owned identity.
+- **States.** `ready`. One card per present type with that type's hydrated count.
+- **Action.** View all writes `?type=loan`, `?type=fixed`, or `?type=stream` and
+  opens that collection.
+- **Copy rules.** Type names are Self-Repaying Loans, Your streams, and Fixed
+  Returns. Show the count. Do not sum unlike symbols on the cards. Do not put a
+  pledged stream on Your streams.
 - **Data authority.** `on-chain` for counts after hydration. Destination URL is `pure-client`.
 
 ## `UI-WATCH-COLLECTION`
 
 - **ID.** `UI-WATCH-COLLECTION`
 - **Purpose.** List every position of one type, including waiting and completed, with per-underlying totals and sort.
-- **Visible when.** Complete hydration found multiple positions of one type and none of the other, or the URL names that type on a mixed wallet. Advanced disclosure does not replace this on Default.
+- **Visible when.** Complete hydration found multiple positions of one type and none of the others, or the URL names that type on a mixed wallet. Advanced disclosure does not replace this on Default. Waiting requests list in the loan collection. Wallet-held unpledged streams list in the stream collection.
 - **States.** `ready` with all hydrated rows. Sort is `id` / `status` / `amount` and only reorders. Totals group by underlying and never sum unlike symbols.
 - **Action.** A row writes that identity and opens detail. Sort does not change counts or hide rows.
 - **Copy rules.** Status stays meaningful (waiting, working, active, completed). Retired-market rows carry `retired market`.

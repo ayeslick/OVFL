@@ -67,12 +67,12 @@ export function NoStream() {
       <h2 className="borrow-title">Borrow needs a stream</h2>
       <p className="borrow-lede">
         Borrow requires an eligible stream that this wallet can transfer. Create one
-        from Assets, or start from the guided path if this wallet has no stream yet.
+        first, or start from the guided path if this wallet has no stream yet.
       </p>
       <p>
-        <a href="/create">CREATE A STREAM</a>
+        <a href="/create/stream/">CREATE A STREAM</a>
         {" · "}
-        <a href="/">GUIDED FIRST RUN</a>
+        <a href="/">YOUR OVRFLO</a>
       </p>
     </div>
   );

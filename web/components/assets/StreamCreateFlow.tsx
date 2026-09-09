@@ -6,7 +6,9 @@ import { useConnection, useReadContract, useReadContracts } from "wagmi";
 import type { Address } from "viem";
 import { erc20Abi, ovrfloAbi } from "@/lib/abis";
 import { convertApprovalNeeds, depositCapStatus } from "@/lib/convert";
-import { formatTokenAmount } from "@/lib/format";
+import { formatTokenAmount, formatTruncatedDecimal } from "@/lib/format";
+import { streamCapsuleSegments } from "@/lib/capsule-segments";
+import { FlowLayout } from "@/components/kit/FlowLayout";
 import { applySlippageDown } from "@/lib/modal-logic";
 import { readQuery } from "@/lib/query-keys";
 import type { MarketInfo } from "@/lib/types";
@@ -323,6 +325,15 @@ export function StreamCreateFlow({
   }
 
   return (
+    <FlowLayout
+      segments={streamCapsuleSegments(
+        {
+          remaining: toStream ?? 0n,
+          released: toWallet ?? 0n,
+        },
+        (value) => formatTruncatedDecimal(value, 18, 2),
+      )}
+    >
     <StreamCreate
       stage={stage}
       marketStatus={marketStatus}
@@ -427,6 +438,7 @@ export function StreamCreateFlow({
         streamId !== null ? `/?stream=${streamId.toString()}` : "/"
       }
     />
+    </FlowLayout>
   );
 }
 

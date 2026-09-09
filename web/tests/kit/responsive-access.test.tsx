@@ -62,15 +62,15 @@ describe("CS4-U6 responsive access", () => {
   it("desktop and mobile captures keep the cool canvas, cards, and single compact surface", () => {
     const css = readFileSync(join(WEB_ROOT, "components/kit/kit.css"), "utf8");
     const globals = readFileSync(join(WEB_ROOT, "app/globals.css"), "utf8");
-    expect(globals).toContain("--canvas: #F6F8FC");
-    expect(globals).toContain("--primary: #1769E0");
-    expect(globals).toContain("--radius-card: 16px");
+    expect(globals).toContain("--canvas: #ffffff");
+    expect(globals).toContain("--primary: #078bef");
+    expect(globals).toContain("--radius-card: 28px");
     expect(css).toContain("background: var(--canvas)");
     expect(css).toContain("background: var(--surface)");
     expect(css).toContain("box-shadow: var(--shadow-card)");
     expect(css).toMatch(/\.kit-card[\s\S]*min-height:\s*44px/);
     expect(css).toMatch(/\.kit-entity-row[\s\S]*min-height:\s*64px/);
-    expect(css).toMatch(/\.kit-action[\s\S]*min-height:\s*44px/);
+    expect(css).toMatch(/\.kit-action[\s\S]*min-height:\s*54px/);
     expect(css).toContain("@media (max-width: 767px)");
     expect(css).toMatch(/\.kit-nav\s*\{\s*display:\s*none;/);
     expect(css).toContain("env(safe-area-inset-bottom)");
@@ -123,7 +123,7 @@ describe("CS4-U6 responsive access", () => {
   it("keyboard operates cards, radios, disclosures, menus, rows, and actions with visible focus", () => {
     const css = readFileSync(join(WEB_ROOT, "components/kit/kit.css"), "utf8");
     expect(css).toContain(":focus-visible");
-    expect(css).toContain("outline: 2px solid var(--focus)");
+    expect(css).toContain("outline: 3px solid var(--focus)");
     render(
       <Shell currentNav="create" wallet="CONNECT WALLET">
         <DefaultHub welcome="Choose a position type" />
@@ -248,7 +248,7 @@ describe("CS4-U6 responsive access", () => {
   it("hides decorative medallions from the accessibility tree", () => {
     render(<DefaultHub welcome="Choose a position type" />);
     const medallions = document.querySelectorAll(".kit-medallion");
-    expect(medallions.length).toBe(2);
+    expect(medallions.length).toBe(3);
     for (const node of medallions) {
       expect(node).toHaveAttribute("aria-hidden", "true");
     }

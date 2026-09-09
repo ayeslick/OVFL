@@ -140,7 +140,7 @@ function IntentRows({
       <PendleIntent pendle={pendle} selectedMarket={selectedMarket} />
       <a
         className="kit-action"
-        href="/create"
+        href="/create/stream/"
         data-ui="UI-FIRST-RUN-INTENT-DEPOSIT"
         data-control="UI-FIRST-RUN-INTENT-DEPOSIT"
         data-state={ptReady ? "ready-balance" : "enabled"}

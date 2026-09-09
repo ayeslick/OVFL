@@ -110,7 +110,7 @@ export function ReviewHandoff({
   const liveCopy = reviewLiveCopy({ drifted, checkpoint });
 
   return (
-    <div className="borrow-split" data-ui="UI-REVIEW-SPLIT" data-state={checkpoint}>
+    <div className="borrow-split kit-dialog-content" data-ui="UI-REVIEW-SPLIT" data-state={checkpoint}>
       {liveCopy ? (
         <p className="kit-vh" role="status" aria-live="polite" aria-atomic="true" data-ui="UI-REVIEW-LIVE">
           {liveCopy}
@@ -214,7 +214,7 @@ export function ReviewHandoff({
             ) : null}
           </p>
         ) : null}
-        <div className="borrow-actions">
+        <div className="borrow-actions kit-tx-actions">
           {checkpoint === "approve" && signingBlockedReason ? (
             <ActionButton disabled disabledReason={signingBlockedReason}>
               APPROVE STREAM

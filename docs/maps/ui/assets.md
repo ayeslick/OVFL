@@ -7,7 +7,7 @@
 
 **Purpose of the region.** Two utilities, not a fourth dashboard: the 1:1
 underlying ↔ ovrflo-token converter (approved three-bay exception) and the PT
-deposit that creates a vault stream. Entries: shell nav, borrow's no-stream
+deposit that creates a vault stream. Entries: New position, borrow's no-stream
 state, repay-prepare wrap, any role's position detail, first-run deposit intent.
 
 **Boundary.** Approvals, SETTLEMENT, and receipts are `review.md`
@@ -22,8 +22,8 @@ stream is `borrow.md`.
 - **ID.** `UI-ASSETS-CONVERTER`
 - **Purpose.** Convert underlying and the market's ovrflo token 1:1, with the
   tracked wrap reserve visible as the unwrap bound.
-- **Visible when.** `/assets` is open, or wrap/unwrap is launched in context
-  (repay-prepare, claim-confirmed unwrap, watch detail).
+- **Visible when.** `/create/stream/` is open, or wrap/unwrap is launched in
+  context (repay-prepare, claim-confirmed unwrap, watch detail).
 - **States.** `wrap`, `unwrap`, `loading-reserve`, `unavailable`.
 - **Action.** None itself — children take amounts. Switching direction is
   client-side.
@@ -119,7 +119,7 @@ stream is `borrow.md`.
 - **ID.** `UI-ASSETS-STREAM-SELECT-MARKET`
 - **Purpose.** Choose which approved series to deposit PT into, creating ovrflo
   token plus a Sablier stream.
-- **Visible when.** `STREAM.SELECT_MARKET`.
+- **Visible when.** `STREAM.SELECT_MARKET` on `/create/stream/`.
 - **States.** `loading`, `ready`, `empty`, `unavailable`, `selected`.
 - **Action.** Continue to `UI-ASSETS-STREAM-ENTER-PT`.
 - **Copy rules.** Name series, underlying, maturity. The deposit "mints the

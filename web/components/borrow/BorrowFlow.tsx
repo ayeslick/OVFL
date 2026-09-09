@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
 import { useConnection, usePublicClient, useReadContract, useReadContracts } from "wagmi";
 import { CreateStageFrame } from "@/components/create/CreateStageFrame";
+import { FlowLayout } from "@/components/kit/FlowLayout";
 import { compileCreateIntent } from "@/lib/create-intent";
 import {
   autoFillChoices,
@@ -16,7 +17,7 @@ import {
 } from "@/lib/create-stages";
 import { buildLoanCreateContext, parseStreamSourceId, streamSourceId } from "@/lib/create-flow-context";
 import { getDisclosure, subscribeDisclosure } from "@/lib/disclosure";
-import { formatAprBps, formatUsd } from "@/lib/format";
+import { formatAprBps, formatTruncatedDecimal, formatUsd } from "@/lib/format";
 import { isAddressEqual, parseEventLogs, type Address, type Log } from "viem";
 import { WalletButton } from "wallet-runtime";
 import { ActionButton } from "@/components/kit/ActionButton";
@@ -57,6 +58,7 @@ import {
 import { WAITING_FOR_LIQUIDITY_COPY } from "@/lib/named-surface-state";
 import { suppressStaleSubmit } from "@/lib/named-surface-state";
 import { classifyBorrowError } from "@/lib/borrow";
+import { loanCapsuleSegments } from "@/lib/capsule-segments";
 import { chainId, factoryAddress, ZERO_ADDRESS } from "@/lib/config";
 import { confirmedStepIds } from "@/lib/composite-recovery";
 import { allocateGraphId } from "@/lib/graph-id";
@@ -782,6 +784,22 @@ export function BorrowFlow() {
     error: Boolean(decoded && !isUserRejection(actionTx.error) && !isUserRejection(approveTx.error)),
   });
 
+  const capsuleFormat = (value: bigint) => formatTruncatedDecimal(value, 18, 2);
+  const borrowSegments = loanCapsuleSegments(
+    posting
+      ? {
+          waiting: true,
+          waitingAmount: reviewQuote?.obligation ?? (parsedAmount.ok ? parsedAmount.value : 0n),
+          obligation: 0n,
+          outstanding: 0n,
+        }
+      : {
+          obligation: reviewQuote?.obligation ?? 0n,
+          outstanding: reviewQuote?.obligation ?? 0n,
+        },
+    capsuleFormat,
+  );
+
   return (
     <Shell
       currentNav="create"
@@ -821,6 +839,7 @@ export function BorrowFlow() {
             </div>
           ) : null}
           {connected && !walletReset.walletChanged ? (
+            <FlowLayout compact={compact} segments={borrowSegments}>
             <CreateStageFrame
               stage={stage}
               visibility={visibility}
@@ -1011,6 +1030,7 @@ export function BorrowFlow() {
                 </>
               ) : null}
             </CreateStageFrame>
+            </FlowLayout>
           ) : null}
         </div>
       </ModalErrorBoundary>

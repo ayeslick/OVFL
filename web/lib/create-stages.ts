@@ -16,7 +16,7 @@ export type CreateStage = (typeof CREATE_STAGES)[number];
 
 export type StageMode = "hidden" | "choose" | "block";
 
-export type CreatePositionType = "loan" | "fixed";
+export type CreatePositionType = "loan" | "fixed" | "stream";
 
 export type CreateSourceKind = "existing-stream" | "fresh";
 
@@ -70,7 +70,8 @@ export function selectedSource(
 }
 
 export function stageVisibility(context: CreateStageContext, choices: CreateChoices): StageVisibility {
-  const sourceMode = optionMode(context.sources.length);
+  const sourceMode =
+    context.positionType === "stream" ? "hidden" : optionMode(context.sources.length);
   const underlyingMode = optionMode(context.underlyings.length);
   const source = selectedSource(context, choices);
   const amountFixed = source?.amountFixed === true;

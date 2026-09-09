@@ -195,7 +195,7 @@ export function WatchWrite({
   }
 
   return (
-    <div className="watch-write" data-ui="UI-WATCH-WRITE" data-write={kind}>
+    <div className="watch-write kit-dialog-content" data-ui="UI-WATCH-WRITE" data-write={kind}>
       <SettlementTrace steps={writeTrace} />
       {kind === "repay" && !flow.isConfirmed ? (
         <AmountField
@@ -278,7 +278,7 @@ export function WatchWrite({
           onKeep={onClose}
         />
       ) : null}
-      <div className="watch-actions">
+      <div className="watch-actions kit-tx-actions">
         {flow.isConfirmed ? null : stale ? (
           <ActionButton disabled disabledReason="EVENTS STALE — SIGNING DISABLED">
             {actionLabel(kind, symbol, claimable)}

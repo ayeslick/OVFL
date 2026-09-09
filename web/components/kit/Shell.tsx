@@ -11,13 +11,9 @@ import {
 import { NetworkChip } from "./NetworkChip";
 import { RefetchNotice } from "./RefetchNotice";
 import "./kit.css";
+import "./surfaces.css";
 
-const NAV = [
-  { href: "/", label: "Your OVRFLO", id: "home" },
-  { href: "/create/", label: "Create", id: "create" },
-] as const;
-
-export type ShellNavId = (typeof NAV)[number]["id"];
+export type ShellNavId = "home" | "create";
 
 function StripRetiredLens() {
   const search = useSyncExternalStore(
@@ -68,44 +64,28 @@ export function Shell({
       <StripRetiredLens />
       <header className="kit-shell-header">
         <h1 className="kit-wordmark">
-          <a href="/" data-ui="UI-SHELL-BRAND">
-            OVRFLO
+          <a href="/" data-ui="UI-SHELL-BRAND" aria-current={currentNav === "home" ? "page" : undefined}>
+            <img src="/images/ovrflo-logo.jpeg" alt="" width={56} height={56} />
+            <span>OVRFLO</span>
           </a>
         </h1>
-        <nav className="kit-nav" aria-label="Default" data-ui="UI-SHELL-NAV">
-          {NAV.map((item) => (
-            <a
-              key={item.id}
-              href={item.href}
-              className="kit-nav-link"
-              data-current={currentNav === item.id ? "true" : "false"}
-              aria-current={currentNav === item.id ? "page" : undefined}
-            >
-              {item.label}
-            </a>
-          ))}
-        </nav>
-        <details className="kit-menu" data-ui="UI-SHELL-MENU">
-          <summary>Menu</summary>
-          <nav className="kit-menu-nav" aria-label="Default">
-            {NAV.map((item) => (
-              <a
-                key={item.id}
-                href={item.href}
-                data-current={currentNav === item.id ? "true" : "false"}
-                aria-current={currentNav === item.id ? "page" : undefined}
-              >
-                {item.label}
-              </a>
-            ))}
-            <ModeControl location="menu" />
-          </nav>
-        </details>
         <div className="kit-shell-account">
           <div className="kit-shell-network">{network ?? <NetworkChip />}</div>
           <div className="kit-shell-wallet">{wallet}</div>
           <ModeControl location="account" />
         </div>
+        <details className="kit-menu" data-ui="UI-SHELL-MENU">
+          <summary>Menu</summary>
+          <nav className="kit-menu-nav" aria-label="Default" data-ui="UI-SHELL-NAV">
+            <a href="/" data-current={currentNav === "home" ? "true" : "false"} aria-current={currentNav === "home" ? "page" : undefined}>
+              Your OVRFLO
+            </a>
+            <a href="/create/" data-current={currentNav === "create" ? "true" : "false"} aria-current={currentNav === "create" ? "page" : undefined}>
+              New position
+            </a>
+            <ModeControl location="menu" />
+          </nav>
+        </details>
       </header>
       <div className="kit-shell-body">
         {status}

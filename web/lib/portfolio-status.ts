@@ -1,6 +1,9 @@
 import type { Address } from "viem";
 import type { BorrowerLoanRow } from "@/hooks/useBorrowerBook";
 import type { LenderPositionRow } from "@/hooks/useLenderBook";
+import { formatTruncatedDecimal, formatUsd } from "./format";
+import { tokenUsd8 } from "./usd";
+import type { Usd8 } from "./units";
 import { positionFilled } from "./watch-rows";
 
 export type PortfolioLifecycle = "waiting" | "working" | "active" | "completed";
@@ -74,4 +77,37 @@ export function compareCollectionRows(
   if (left.id < right.id) return 1;
   if (left.id > right.id) return -1;
   return 0;
+}
+
+export function lifecycleLabel(status: PortfolioLifecycle): string {
+  if (status === "waiting") return "Waiting";
+  if (status === "working") return "Working";
+  if (status === "completed") return "Completed";
+  return "Active";
+}
+
+export function hubRollup(
+  totals: readonly UnderlyingTotal[],
+  usd8: Usd8 | null,
+  usdUnderlying: Address | undefined,
+): { valueText: string; secondary: string } {
+  if (totals.length === 0) return { valueText: "—", secondary: "" };
+  if (totals.length === 1) {
+    const row = totals[0]!;
+    const token = `${formatTruncatedDecimal(row.amount, 18, 2)} ${row.symbol}`;
+    if (
+      usd8 !== null &&
+      usdUnderlying &&
+      row.underlying.toLowerCase() === usdUnderlying.toLowerCase()
+    ) {
+      return { valueText: formatUsd(tokenUsd8(row.amount, usd8)), secondary: token };
+    }
+    return { valueText: token, secondary: "" };
+  }
+  return {
+    valueText: `${totals.reduce((sum, row) => sum + row.count, 0)} positions`,
+    secondary: totals
+      .map((row) => `${formatTruncatedDecimal(row.amount, 18, 2)} ${row.symbol}`)
+      .join(" · "),
+  };
 }

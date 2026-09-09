@@ -87,7 +87,7 @@ export function ReviewHandoff({
   const liveCopy = reviewLiveCopy({ drifted, checkpoint });
 
   return (
-    <div className="supply-split" data-ui="UI-REVIEW-SPLIT" data-state={checkpoint}>
+    <div className="supply-split kit-dialog-content" data-ui="UI-REVIEW-SPLIT" data-state={checkpoint}>
       {liveCopy ? (
         <p className="kit-vh" role="status" aria-live="polite" aria-atomic="true" data-ui="UI-REVIEW-LIVE">
           {liveCopy}
@@ -173,7 +173,7 @@ export function ReviewHandoff({
             ) : null}
           </p>
         ) : null}
-        <div className="supply-actions">
+        <div className="supply-actions kit-tx-actions">
           {checkpoint === "approve" && signingBlockedReason ? (
             <ActionButton disabled disabledReason={signingBlockedReason}>
               {`APPROVE ${underlyingSymbol}`}

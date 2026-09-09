@@ -26,6 +26,12 @@ export type CompileCreateArgs = {
 export function compileCreateIntent(args: CompileCreateArgs): ActionIntent {
   const filled = autoFillChoices(args.context, args.choices);
   const source = selectedSource(args.context, filled);
+  if (args.positionType === "stream") {
+    return {
+      type: "deposit",
+      amount: args.amount ?? filled.amount ?? "",
+    };
+  }
   if (args.positionType === "fixed") {
     const intent: SupplyIntent = {
       type: "supply",

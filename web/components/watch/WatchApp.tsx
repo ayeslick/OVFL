@@ -31,7 +31,7 @@ import {
   classifyPortfolio,
   type PortfolioHydration,
 } from "@/lib/portfolio-matrix";
-import { groupTotalsByUnderlying, type CollectionSort } from "@/lib/portfolio-status";
+import { groupTotalsByUnderlying, hubRollup, type CollectionSort } from "@/lib/portfolio-status";
 import type { ReadOutcome } from "@/lib/read-outcome";
 import { queryClient } from "@/lib/query-client";
 import {
@@ -61,10 +61,12 @@ import {
 } from "@/lib/watch-url";
 import { BorrowedDetail } from "./BorrowedDetail";
 import { ClosedLoanDetail } from "./ClosedLoanDetail";
+import { DefaultCollection } from "./DefaultCollection";
 import {
   PortfolioEmpty,
   PortfolioHub,
   PortfolioIncomplete,
+  type HubGroup,
 } from "./PortfolioViews";
 import { StreamClosedDetail, StreamDetail } from "./StreamDetail";
 import { SuppliedDetail } from "./SuppliedDetail";
@@ -144,6 +146,12 @@ export function WatchApp() {
   const requestBookComplete = requestBook.status === "ready" && requestBook.data.complete;
   const requestBookFailed = requestBook.status === "unavailable";
   const waitingRequests = requestBook.data?.requests ?? [];
+  const walletStreams = useMemo(() => {
+    const waitingIds = new Set(waitingRequests.map((row) => row.streamId));
+    return ownedStreams.filter(
+      (row) => !waitingIds.has(row.streamId) && !pledgedByStream.has(row.streamId.toString()),
+    );
+  }, [ownedStreams, waitingRequests, pledgedByStream]);
   const loanBookWithWaiting = {
     ...loanBook,
     renderCount: loanBook.renderCount + waitingRequests.length,
@@ -210,8 +218,9 @@ export function WatchApp() {
         requestId: row.requestId,
         streamId: row.streamId,
       })),
+      streams: walletStreams.map((row) => row.streamId),
     }),
-    [portfolioComplete, loans, positions, waitingRequests],
+    [portfolioComplete, loans, positions, waitingRequests, walletStreams],
   );
   const surface = classifyPortfolio(hydration, url);
 
@@ -232,7 +241,9 @@ export function WatchApp() {
             ? suppliedFreshness
             : surface.kind === "collection" && surface.type === "fixed"
               ? suppliedFreshness
-              : lensFreshness;
+              : surface.kind === "collection" && surface.type === "stream"
+                ? streamsFreshness
+                : lensFreshness;
 
   const lastReadAt =
     resolvedLens === "streams" && streams.metadata.blockTimestamp !== undefined
@@ -353,7 +364,8 @@ export function WatchApp() {
     Boolean(streamForDetail) ||
     showStreamClosed;
   const canLeaveDetail =
-    isAdvanced || loans.length + positions.length + waitingRequests.length > 1;
+    isAdvanced ||
+    loans.length + positions.length + waitingRequests.length + walletStreams.length > 1;
 
   useEffect(() => {
     if (!connected) return;
@@ -392,8 +404,8 @@ export function WatchApp() {
     heading?.focus();
   }, [surfaceKey]);
 
-  const loanTotals = groupTotalsByUnderlying(
-    loans.map((loan) => {
+  const loanTotals = groupTotalsByUnderlying([
+    ...loans.map((loan) => {
       const market = marketForLending(markets.markets, loan.lending, loan.market);
       return {
         underlying: market?.underlying ?? loan.market,
@@ -401,7 +413,15 @@ export function WatchApp() {
         amount: loan.outstanding,
       };
     }),
-  );
+    ...waitingRequests.map((request) => {
+      const market = marketForLending(markets.markets, request.lending, request.market);
+      return {
+        underlying: market?.underlying ?? request.market,
+        symbol: market ? symbolFor(symbols, market.underlying) : tokenLabel,
+        amount: request.targetBorrow,
+      };
+    }),
+  ]);
   const supplyTotals = groupTotalsByUnderlying(
     positions.map((position) => {
       const market = marketForLending(markets.markets, position.lending, position.market);
@@ -412,6 +432,56 @@ export function WatchApp() {
       };
     }),
   );
+  const streamTotals = groupTotalsByUnderlying(
+    walletStreams.map((stream) => {
+      const market =
+        (stream.market
+          ? markets.markets.find((row) => row.market.toLowerCase() === stream.market!.toLowerCase())
+          : undefined) ??
+        markets.markets.find((row) => row.ovrfloToken.toLowerCase() === stream.asset.toLowerCase());
+      return {
+        underlying: market?.underlying ?? stream.asset,
+        symbol: market ? symbolFor(symbols, market.underlying) : symbolFor(symbols, stream.asset),
+        amount: stream.remaining,
+      };
+    }),
+  );
+  const usdUnderlying =
+    selectedPositionMarket?.underlying ??
+    selectedLoanMarket?.underlying ??
+    markets.markets[0]?.underlying;
+  const loanCount = loans.length + waitingRequests.length;
+  const hubGroups: HubGroup[] = [];
+  if (loanCount > 0) {
+    const rollup = hubRollup(loanTotals, usdQuote, usdUnderlying);
+    hubGroups.push({
+      type: "loan",
+      count: loanCount,
+      valueText: rollup.valueText,
+      label: "",
+      secondary: rollup.secondary,
+    });
+  }
+  if (positions.length > 0) {
+    const rollup = hubRollup(supplyTotals, usdQuote, usdUnderlying);
+    hubGroups.push({
+      type: "fixed",
+      count: positions.length,
+      valueText: rollup.valueText,
+      label: "",
+      secondary: rollup.secondary,
+    });
+  }
+  if (walletStreams.length > 0) {
+    const rollup = hubRollup(streamTotals, usdQuote, usdUnderlying);
+    hubGroups.push({
+      type: "stream",
+      count: walletStreams.length,
+      valueText: rollup.valueText,
+      label: "",
+      secondary: rollup.secondary,
+    });
+  }
 
   const details = (
     <div className="watch-detail">
@@ -555,37 +625,27 @@ export function WatchApp() {
     />
   );
 
-  const collectionWall = (type: PortfolioType) => (
-    <Wall
-      tabs={tabs}
-      lens={type === "loan" ? "borrowed" : "supplied"}
-      onSelectLens={onSelectLens}
-      positions={positions}
+  const defaultCollection = (type: PortfolioType) => (
+    <DefaultCollection
+      type={type}
       loans={loans}
-      streams={ownedStreams}
-      panelStatus="ready"
-      pledgedByStream={pledgedByStream}
-      loanStreams={loanStreams}
+      positions={positions}
+      streams={walletStreams}
+      waitingRequests={waitingRequests}
       nowSeconds={nowSeconds}
-      nowMs={nowMs}
-      lastReadAt={lastReadAt}
-      selection={url.selection}
-      onSelect={onSelect}
-      streamsDegraded={null}
-      mode="collection"
-      collectionType={type}
       sort={sort}
       onSort={setSort}
-      retired={retired}
-      totals={type === "loan" ? loanTotals : supplyTotals}
-      waitingRequests={waitingRequests}
+      onOpenLoan={(lending, id) => onSelect({ kind: "loan", lending, id })}
+      onOpenPosition={(lending, id) => onSelect({ kind: "position", lending, id })}
+      onOpenStream={(id) => onSelect({ kind: "stream", id })}
     />
   );
 
   const confirmedCards = (
     <>
-      {loans.length > 0 ? collectionWall("loan") : null}
-      {positions.length > 0 ? collectionWall("fixed") : null}
+      {loanCount > 0 ? defaultCollection("loan") : null}
+      {positions.length > 0 ? defaultCollection("fixed") : null}
+      {walletStreams.length > 0 ? defaultCollection("stream") : null}
     </>
   );
 
@@ -600,13 +660,9 @@ export function WatchApp() {
   ) : surface.kind === "empty" ? (
     <PortfolioEmpty />
   ) : surface.kind === "hub" ? (
-    <PortfolioHub
-      loanCount={loans.length + waitingRequests.length}
-      fixedCount={positions.length}
-      onOpenCollection={onOpenCollection}
-    />
+    <PortfolioHub groups={hubGroups} onOpenCollection={onOpenCollection} />
   ) : surface.kind === "collection" ? (
-    collectionWall(surface.type)
+    defaultCollection(surface.type)
   ) : (
     details
   );
@@ -758,7 +814,7 @@ function DisconnectedEntry() {
         Once a wallet is connected, this home becomes Your OVRFLO: positions
         you can watch.
       </p>
-      <p>Create launches Self-Repaying Loans and Fixed Returns from here. They do not require a book to start.</p>
+      <p>New position launches Self-Repaying Loans, Streams, and Fixed Returns from here. They do not require a book to start.</p>
     </section>
   );
 }

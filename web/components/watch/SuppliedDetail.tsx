@@ -4,28 +4,25 @@ import { useState } from "react";
 import type { Address } from "viem";
 import { ActionButton } from "@/components/kit/ActionButton";
 import { Amount } from "@/components/kit/Amount";
-import { CapitalBand } from "@/components/kit/CapitalBand";
-import { Ribbon } from "@/components/kit/Ribbon";
 import { RollingNumber } from "@/components/kit/RollingNumber";
+import { fixedCapsuleSegments } from "@/lib/capsule-segments";
 import type { LenderPositionRow } from "@/hooks/useLenderBook";
 import { formatAprBps, formatAsOf, formatCoverDate, formatMaturityDate, formatTruncatedDecimal } from "@/lib/format";
 import type { Freshness } from "@/lib/freshness";
 import type { MarketInfo } from "@/lib/types";
-import {
-  fraction01,
-  positionClaimable,
-  positionFilled,
-  suppliedMatchState,
-} from "@/lib/watch-rows";
+import { positionClaimable, positionFilled, suppliedMatchState } from "@/lib/watch-rows";
 import {
   describeFixedReturnCompletion,
   type FixedReturnLoanTerm,
 } from "@/lib/fixed-return-completion";
 import { namedSurfaceSpec } from "@/lib/named-surface-state";
-import { SurfaceHeading } from "@/components/kit/SurfaceHeading";
-import { RetiredMarketMarker } from "./PortfolioViews";
+import { RetiredMarketMarker, DetailShell } from "./PortfolioViews";
 import { WatchWrite } from "./WatchWrite";
 import "./watch.css";
+
+function formatAmount(value: bigint): string {
+  return formatTruncatedDecimal(value, 18, 2);
+}
 
 export function SuppliedDetail({
   position,
@@ -61,170 +58,121 @@ export function SuppliedDetail({
   const unfilled = position.availableLiquidity;
   const supplied = filled + unfilled;
   const claimable = positionClaimable(position);
+  const arriving = filled > claimable ? filled - claimable : 0n;
   const match = suppliedMatchState(filled, unfilled);
   const completion = describeFixedReturnCompletion({ filled, unfilled, loans: loanTerms });
-  const resting = match === "resting";
   const stale = !signingAllowed;
-  const ribbonState = stale ? "degraded" : resting ? "inert" : "edge";
+  const status = match === "resting" ? "Waiting" : match === "partial" ? "Working" : "Active";
+  const segments = fixedCapsuleSegments(
+    {
+      unmatched: unfilled,
+      supplied,
+      arriving,
+      arrived: claimable,
+      claimed: 0n,
+    },
+    formatAmount,
+  );
+  const facts = [
+    { label: "Supplied", value: `${formatTruncatedDecimal(supplied, 18, 5)} ${symbol}` },
+    { label: "Filled", value: `${formatTruncatedDecimal(filled, 18, 5)} ${symbol}` },
+    { label: "Unfilled", value: `${formatTruncatedDecimal(unfilled, 18, 5)} ${symbol}` },
+    { label: "Claimable", value: `${formatTruncatedDecimal(claimable, 18, 5)} ${symbol}` },
+    { label: "APR", value: formatAprBps(position.aprBps) },
+  ];
+  if (completion.status === "waiting") {
+    facts.push({ label: "Status", value: "Waiting. Unmatched funds stay withdrawable." });
+  }
+  if (completion.status === "single-term") {
+    facts.push({ label: "Return date", value: formatCoverDate(completion.completionDate) });
+  }
+  if (completion.status === "multiple-dates") {
+    facts.push({ label: "Dates", value: completion.summary });
+    for (const loan of completion.loans) {
+      facts.push({
+        label: `Loan ${loan.loanId.toString()}`,
+        value: `${formatTruncatedDecimal(loan.matchedAmount, 18, 5)} · ${formatCoverDate(loan.completionDate)}`,
+      });
+    }
+    if (completion.withdrawableUnfilled) {
+      facts.push({ label: "Unfilled suffix", value: "Waiting. Withdrawable." });
+    }
+  }
+  if (market) {
+    facts.push({ label: "Maturity", value: formatMaturityDate(market.expiryCached).toUpperCase() });
+  }
 
   return (
     <article data-ui="UI-WATCH-SUPPLIED-DETAIL" data-region="supplied-detail" data-state={match}>
-      <SurfaceHeading>Fixed Return</SurfaceHeading>
       {retired ? <RetiredMarketMarker /> : null}
       {filled === 0n && unfilled > 0n ? (
         <p className="watch-note" data-named-state="no-borrower-demand-yet">
           {namedSurfaceSpec("no-borrower-demand-yet").copy}
         </p>
       ) : null}
-      {filled > 0n ? (
-        <div className="kit-hero">
-          <span className="kit-hero-kicker">YOUR EARNINGS</span>
-          <RollingNumber
-            value={claimable}
-            ticking
-            accent="gold"
-            displayDecimals={8}
-            nowMs={nowMs}
-          />
-          {usdMode === "usd" ? (
-            <Amount
-              token={formatTruncatedDecimal(claimable, 18, 8)}
+      <DetailShell
+        title="Fixed Return"
+        status={status}
+        segments={segments}
+        facts={facts}
+        note={freshnessCaption(freshness)}
+        actions={
+          write && lending && market ? (
+            <WatchWrite
+              kind={write}
+              lending={lending}
+              market={market}
+              positionId={position.id}
+              claimPairs={position.pairs}
+              claimable={claimable}
+              unfilled={unfilled}
               symbol={symbol}
-              usd={usdText}
-              usdAvailable={usdAvailable}
-              mode="usd"
+              underlyingSymbol={underlyingSymbol}
+              signingAllowed={signingAllowed}
+              onClose={() => setWrite(null)}
             />
           ) : (
-            <span className="watch-hero-meta">{symbol}</span>
-          )}
-        </div>
-      ) : null}
-
-      {write && lending && market ? (
-        <WatchWrite
-          kind={write}
-          lending={lending}
-          market={market}
-          positionId={position.id}
-          claimPairs={position.pairs}
-          claimable={claimable}
-          unfilled={unfilled}
-          symbol={symbol}
-          underlyingSymbol={underlyingSymbol}
-          signingAllowed={signingAllowed}
-          onClose={() => setWrite(null)}
-        />
-      ) : (
-        <div className="watch-actions">
-          {claimable > 0n ? (
-            stale ? (
-              <ActionButton disabled disabledReason="EVENTS STALE — SIGNING DISABLED">
-                {`CLAIM ${formatTruncatedDecimal(claimable, 18, 5)} ${symbol}`}
-              </ActionButton>
-            ) : (
-              <ActionButton variant="primary" onClick={() => setWrite("claim")}>
-                {`CLAIM ${formatTruncatedDecimal(claimable, 18, 5)} ${symbol}`}
-              </ActionButton>
-            )
-          ) : null}
-          {unfilled > 0n ? (
-            stale ? (
-              <ActionButton disabled disabledReason="EVENTS STALE — SIGNING DISABLED">
-                WITHDRAW UNFILLED
-              </ActionButton>
-            ) : (
-              <ActionButton onClick={() => setWrite("withdraw")}>WITHDRAW UNFILLED</ActionButton>
-            )
-          ) : null}
-        </div>
-      )}
-
-      <Ribbon
-        state={ribbonState}
-        progress={resting ? 0 : fraction01(filled, supplied)}
-        valueText={`${formatTruncatedDecimal(claimable, 18, 8)} ${symbol}`}
-        originLabel="ORIGIN"
-        terminalLabel={market ? formatMaturityDate(market.expiryCached).toUpperCase() : "TERMINAL"}
+            <>
+              {filled > 0n ? (
+                <>
+                  <span className="kit-hero-kicker">YOUR EARNINGS</span>
+                  <RollingNumber value={claimable} ticking accent="gold" displayDecimals={8} nowMs={nowMs} />
+                  {usdMode === "usd" ? (
+                    <Amount
+                      token={formatTruncatedDecimal(claimable, 18, 8)}
+                      symbol={symbol}
+                      usd={usdText}
+                      usdAvailable={usdAvailable}
+                      mode="usd"
+                    />
+                  ) : null}
+                </>
+              ) : null}
+              {claimable > 0n ? (
+                stale ? (
+                  <ActionButton disabled disabledReason="EVENTS STALE — SIGNING DISABLED">
+                    {`CLAIM ${formatTruncatedDecimal(claimable, 18, 5)} ${symbol}`}
+                  </ActionButton>
+                ) : (
+                  <ActionButton variant="primary" onClick={() => setWrite("claim")}>
+                    {`CLAIM ${formatTruncatedDecimal(claimable, 18, 5)} ${symbol}`}
+                  </ActionButton>
+                )
+              ) : null}
+              {unfilled > 0n ? (
+                stale ? (
+                  <ActionButton disabled disabledReason="EVENTS STALE — SIGNING DISABLED">
+                    WITHDRAW UNFILLED
+                  </ActionButton>
+                ) : (
+                  <ActionButton onClick={() => setWrite("withdraw")}>WITHDRAW UNFILLED</ActionButton>
+                )
+              ) : null}
+            </>
+          )
+        }
       />
-      <CapitalBand
-        state={resting ? "resting" : stale ? "degraded" : "segmented"}
-        valueText={`${formatTruncatedDecimal(filled, 18, 5)} filled / ${formatTruncatedDecimal(unfilled, 18, 5)} ${symbol} unfilled`}
-        segments={capitalSegments(position, filled, unfilled, supplied)}
-      />
-
-      <dl className="watch-facts">
-        <Fact label="SUPPLIED" value={`${formatTruncatedDecimal(supplied, 18, 5)} ${symbol}`} />
-        <Fact label="FILLED" value={`${formatTruncatedDecimal(filled, 18, 5)} ${symbol}`} />
-        <Fact label="UNFILLED" value={`${formatTruncatedDecimal(unfilled, 18, 5)} ${symbol}`} />
-        <Fact label="CLAIMABLE" value={`${formatTruncatedDecimal(claimable, 18, 5)} ${symbol}`} />
-        <Fact label="APR" value={formatAprBps(position.aprBps)} />
-        {completion.status === "waiting" ? (
-          <Fact label="STATUS" value="Waiting. Unmatched funds stay withdrawable." />
-        ) : null}
-        {completion.status === "single-term" ? (
-          <Fact
-            label="RETURN DATE"
-            value={formatCoverDate(completion.completionDate)}
-          />
-        ) : null}
-        {completion.status === "multiple-dates" ? (
-          <Fact label="DATES" value={completion.summary} />
-        ) : null}
-        {completion.status === "multiple-dates"
-          ? completion.loans.map((loan) => (
-              <Fact
-                key={loan.loanId.toString()}
-                label={`LOAN ${loan.loanId.toString()}`}
-                value={`${formatTruncatedDecimal(loan.matchedAmount, 18, 5)} · ${formatCoverDate(loan.completionDate)}`}
-              />
-            ))
-          : null}
-        {completion.status === "multiple-dates" && completion.withdrawableUnfilled ? (
-          <Fact label="UNFILLED SUFFIX" value="Waiting. Withdrawable." />
-        ) : null}
-        {market ? <Fact label="MATURITY" value={formatMaturityDate(market.expiryCached).toUpperCase()} /> : null}
-      </dl>
-      <p className="watch-freshness">{freshnessCaption(freshness)}</p>
     </article>
-  );
-}
-
-function capitalSegments(
-  position: LenderPositionRow,
-  filled: bigint,
-  unfilled: bigint,
-  supplied: bigint,
-) {
-  if (supplied <= 0n) return [{ id: "u", fraction: 1, kind: "unfilled" as const }];
-  if (filled === 0n) return [{ id: "u", fraction: 1, kind: "unfilled" as const }];
-  const fromPairs = position.pairs.filter((pair) => pair.contribution > 0n);
-  if (fromPairs.length > 0) {
-    return [
-      ...fromPairs.map((pair, index) => ({
-        id: pair.loanId.toString(),
-        fraction: fraction01(pair.contribution, supplied),
-        kind: "filled" as const,
-        divider: index > 0,
-      })),
-      ...(unfilled > 0n
-        ? [{ id: "u", fraction: fraction01(unfilled, supplied), kind: "unfilled" as const, divider: true }]
-        : []),
-    ];
-  }
-  return [
-    { id: "f", fraction: fraction01(filled, supplied), kind: "filled" as const },
-    ...(unfilled > 0n
-      ? [{ id: "u", fraction: fraction01(unfilled, supplied), kind: "unfilled" as const, divider: true }]
-      : []),
-  ];
-}
-
-function Fact({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="watch-fact">
-      <dt>{label}</dt>
-      <dd>{value}</dd>
-    </div>
   );
 }
 

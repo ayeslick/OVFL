@@ -1,0 +1,91 @@
+# Scratch decision record — schema: docs/maps/SCHEMAS.md §4
+summary_ref: "docs/plans/2026-09-09-001-refactor-frontend-reduction-plan.md"
+
+goal: >
+  Adopt the approved zip Default look on live Markets. Keep contract reads
+  and action-graph writes. Drop destination tabs. Add Stream as a Default
+  type. Capsules show Remaining/Repaid from lending, not stream withdrawable.
+
+state_keys_touched:
+  - persist.disclosure
+  - persist.usd-mode
+  - watch.portfolio-type
+  - watch.selected-entity
+  - chrome.disclosure
+
+writers_readers:
+  - writes: web/components/kit/Shell.tsx
+  - writes: web/components/kit/kit.css
+  - writes: web/app/globals.css
+  - writes: web/lib/parse.ts
+  - writes: web/lib/watch-url.ts
+  - writes: web/lib/portfolio-matrix.ts
+  - writes: web/components/watch/WatchApp.tsx
+  - writes: web/components/watch/PortfolioViews.tsx
+  - writes: web/app/create/page.tsx
+  - reads: web/lib/disclosure.ts
+  - reads: web/hooks/useBorrowerBook.ts
+  - reads: web/hooks/useLenderBook.ts
+  - reads: web/hooks/useStreams.ts
+
+trust_domains:
+  - fact: Default chrome, tokens, and capsule geometry
+    domain: pure-client
+    moved_from: null
+  - fact: Portfolio kind from classifyPortfolio
+    domain: projection
+    moved_from: null
+  - fact: Loan remaining and repaid
+    domain: on-chain
+    moved_from: null
+  - fact: Stream releasing and released
+    domain: on-chain
+    moved_from: null
+  - fact: Fixed Return arriving, arrived, claimed, waiting
+    domain: on-chain
+    moved_from: null
+  - fact: USD figures on hub rollups
+    domain: projection
+    moved_from: null
+
+rejected_alternatives:
+  - option: Host the zip dist/ as Markets
+    why_not: Demo wallet, clock, and matching are not protocol authority.
+  - option: Keep Your OVRFLO and Create destination tabs
+    why_not: Zip chrome is wordmark home plus wallet. Create is a flow.
+  - option: Count stream withdrawable as loan repaid
+    why_not: Zip START-HERE forbids that. Lending repaid is the source.
+  - option: Wait for frontend-reduction deletions
+    why_not: Owner asked for the look on today's read and write stack.
+
+invariants_held:
+  - invariant: Incomplete scan never routes from a provisional count.
+    how: classifyPortfolio still returns incomplete until books complete.
+  - invariant: USD never enters calldata.
+    how: Capsule and hub USD stay display. Writes stay token-native.
+  - invariant: Remaining plus Repaid equals obligation.
+    how: Adapter uses outstanding and repaid from the lending row.
+  - invariant: Failed reads never become zero.
+    how: WatchApp incomplete and unavailable branches stay.
+  - invariant: Advanced is disclosure, not a destination.
+    how: Mode control stays in account and menu. No query param.
+
+risks:
+  - risk: Tests still assert CS4-U1 tabs, Schibsted tokens, and two types.
+    residual: Rewrite token, shell-nav, parse, and matrix tests.
+  - risk: Wallet-held stream ids collide with waiting-request stream ids.
+    residual: Waiting requests stay in the loan group. Stream collection lists unpledged wallet streams only.
+  - risk: Capsule animation could Number() a bigint.
+    how: Format display strings from bigint. Animate weights only.
+
+diff_hints:
+  - path: DESIGN.md
+    why: Token and chrome contract must match the zip before CSS.
+  - path: web/components/kit/Shell.tsx
+    why: Destination tabs die. Logo wordmark is home.
+  - path: web/lib/portfolio-matrix.ts
+    why: Third type is wallet-held streams.
+  - path: web/components/kit/Capsule.tsx
+    why: SVG segments replace Default ribbons.
+  - path: web/lib/capsule-segments.ts
+    why: Remaining/Repaid must not use withdrawable.

@@ -410,7 +410,7 @@ describe("watch shell + entry", () => {
     const nav = document.querySelector('[data-ui="UI-SHELL-NAV"]');
     expect(nav).not.toBeNull();
     expect(nav?.textContent).toContain("Your OVRFLO");
-    expect(nav?.textContent).toContain("Create");
+    expect(nav?.textContent).toContain("New position");
     expect(nav?.textContent).not.toContain("Activity");
     expect(screen.getByText(/Your OVRFLO: positions/i)).toBeInTheDocument();
     expect(screen.queryByText(/TVL/i)).not.toBeInTheDocument();
@@ -502,8 +502,7 @@ describe("watch shell + entry", () => {
 
   it("marks Your OVRFLO current on home", () => {
     render(<WatchApp />);
-    const nav = document.querySelector('[data-ui="UI-SHELL-NAV"]');
-    expect(nav?.querySelector('[href="/"]')).toHaveAttribute("aria-current", "page");
+    expect(document.querySelector('[data-ui="UI-SHELL-BRAND"]')).toHaveAttribute("aria-current", "page");
   });
 
   it("does not paint STREAM CLOSED when an open loan exists for the selected stream", async () => {

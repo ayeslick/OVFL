@@ -17,22 +17,22 @@ describe("CS4-U1 visual tokens", () => {
     const design = frontmatterBlock(readFileSync(join(REPO_ROOT, "DESIGN.md"), "utf8"));
     const globals = readFileSync(join(WEB_ROOT, "app/globals.css"), "utf8");
     const required = [
-      ["canvas", "#F6F8FC"],
+      ["canvas", "#FFFFFF"],
       ["surface", "#FFFFFF"],
-      ["ink", "#0B1F3A"],
-      ["muted", "#627187"],
-      ["border", "#D9E2EF"],
-      ["primary", "#1769E0"],
-      ["loan", "#2B7DE9"],
-      ["fixed_return", "#218A62"],
+      ["ink", "#051A42"],
+      ["muted", "#687E9F"],
+      ["border", "#DCE7F3"],
+      ["primary", "#078BEF"],
+      ["loan", "#079CF0"],
+      ["fixed_return", "#06966D"],
     ];
     for (const [key, hex] of required) {
       expect(design).toContain(`${key}: "${hex}"`);
     }
-    expect(globals).toContain("--canvas: #F6F8FC");
-    expect(globals).toContain("--primary: #1769E0");
-    expect(globals).toContain("--radius-control: 10px");
-    expect(globals).toContain("--radius-card: 16px");
+    expect(globals).toContain("--canvas: #ffffff");
+    expect(globals).toContain("--primary: #078bef");
+    expect(globals).toContain("--radius-control: 999px");
+    expect(globals).toContain("--radius-card: 28px");
     expect(globals).toContain("--gold: var(--primary)");
   });
 
@@ -51,7 +51,8 @@ describe("CS4-U1 visual tokens", () => {
   it("ships a static-export create page", () => {
     const createPage = readFileSync(join(WEB_ROOT, "app/create/page.tsx"), "utf8");
     expect(createPage).toContain('currentNav="create"');
-    expect(createPage).toContain("StreamCreateFlow");
+    expect(createPage).toContain("DefaultHub");
+    expect(createPage).not.toContain("StreamCreateFlow");
     expect(createPage).not.toContain("/activity/");
   });
 

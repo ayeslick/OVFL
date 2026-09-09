@@ -148,4 +148,15 @@ describe("create stage grammar", () => {
     expect(previousVisibleStage("outcome", visibility)).toBe("source");
     expect(previousVisibleStage("source", visibility)).toBeNull();
   });
+
+  it("hides SOURCE for stream create even when a source option exists", () => {
+    const context: CreateStageContext = {
+      positionType: "stream",
+      sources: [{ id: "fresh", kind: "fresh", amountFixed: false }],
+      underlyings: [{ id: "wsteth" }],
+      terms: [{ id: "2027-03" }],
+      outcomes: [{ id: "deposit" }],
+    };
+    expect(stageVisibility(context, emptyChoices()).source).toBe("hidden");
+  });
 });

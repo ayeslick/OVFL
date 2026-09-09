@@ -9,11 +9,11 @@
 `web/components/ModalErrorBoundary.tsx`.
 U7 lands `Footer`. Wallet connect/disconnect is `WalletButton` from `wallet-runtime` (`web/components/WalletRuntime.tsx`).
 
-**Purpose of the region.** Identify the application, connect a wallet, navigate
-to Your OVRFLO and Create, expose Default / Advanced disclosure, and
-own every app-wide honesty surface: disconnected entry, syncing, status, route
-crashes, the write-path network gate, and the token/USD display switch. The shell
-holds no market figure of its own.
+**Purpose of the region.** Identify the application, connect a wallet, reach
+Your OVRFLO from the wordmark, open New position from the menu, expose Default /
+Advanced disclosure, and own every app-wide honesty surface: disconnected entry,
+syncing, status, route crashes, the write-path network gate, and the token/USD
+display switch. The shell holds no market figure of its own.
 
 **Boundary.** The watch surface, first-run, and every flow render *inside* the shell.
 Disconnected entry copy is this brief's (R12, reframed `ENTRY.DISCONNECTED`). Connected
@@ -88,18 +88,20 @@ counts) anywhere in this region.
 ## `UI-SHELL-NAV`
 
 - **ID.** `UI-SHELL-NAV`
-- **Purpose.** Reach Your OVRFLO and Create from any connected or
-  disconnected surface.
-- **Visible when.** Always, alongside the wallet control. Desktop shows the
-  two links. Compact width uses `UI-SHELL-MENU` for the same destinations.
+- **Purpose.** Reach Your OVRFLO and New position from the menu. Create is a
+  flow, not a destination tab.
+- **Visible when.** Always mounted in `UI-SHELL-MENU`. Compact width shows the
+  menu. Wide width keeps the menu closed. The wordmark (`UI-SHELL-BRAND`) is
+  the home control on every width.
 - **States.**
   - `idle` — links present, none current.
-  - `current` — `/` marks Your OVRFLO; `/create/`, `/borrow/`, and `/supply/`
-    mark Create. `/assets/` and `/risk/` mark none.
+  - `current` — `/` marks Your OVRFLO. `/create/`, `/create/stream/`, `/borrow/`,
+    and `/supply/` mark New position. `/risk/` marks none.
 - **Action.** Navigates to `/` or `/create/`. Submits nothing.
-  Do not invent Dashboard, Markets, or Activity destinations. `/borrow/` and
-  `/supply/` remain typed create paths, not Default nav items.
-- **Copy rules.** Labels: `Your OVRFLO`, `Create`. Do not alternate
+  Do not invent Dashboard, Markets, or Activity destinations. `/borrow/`,
+  `/supply/`, and `/create/stream/` remain typed create paths, not Default nav
+  items.
+- **Copy rules.** Labels: `Your OVRFLO`, `New position`. Do not alternate
   Your OVRFLO with Portfolio. Do not show counts, badges, or "needs you"
   markers on nav. Sentence case for the labels as written.
 - **Data authority.** `pure-client` — which route is open.
@@ -108,7 +110,7 @@ counts) anywhere in this region.
 
 - **ID.** `UI-SHELL-MENU`
 - **Purpose.** Reach the same Default destinations and the mode switch when the
-  compact layout hides the desktop nav.
+  compact layout opens the menu.
 - **Visible when.** Compact width (767px and below). The logo stays visible.
 - **States.** `closed`, `open`.
 - **Action.** Opens the menu. Links match `UI-SHELL-NAV`. The mode control
@@ -149,23 +151,24 @@ counts) anywhere in this region.
 
 - **ID.** `UI-SHELL-ENTRY-DISCONNECTED`
 - **Purpose.** Explain what home becomes once a wallet is connected, and offer
-  Create as the launch into Self-Repaying Loans and Fixed Returns, without
-  pretending the visitor already has a book.
+  New position as the launch into Self-Repaying Loans, Streams, and Fixed
+  Returns, without pretending the visitor already has a book.
 - **Visible when.** No wallet is connected. This is the flow spec's `ENTRY.DISCONNECTED`
   render, reframed to the watch-surface model (R12). It replaces the main surface; it
   does not render on top of a watch wall.
 - **States.** One: rendered. There is no loading, empty, or error variant — nothing
   account-scoped has been asked yet. Connecting transitions out of this control into
   `UI-SHELL-ENTRY-SYNCING`, then to watch or first-run per R12.
-- **Action.** `CONNECT WALLET` is `UI-SHELL-WALLET`. Create is `UI-SHELL-NAV`.
-  Connecting from this surface does not preserve a fictional destination; R12
-  decides the landing.
+- **Action.** `CONNECT WALLET` is `UI-SHELL-WALLET`. New position is
+  `UI-SHELL-NAV`. Connecting from this surface does not preserve a fictional
+  destination; R12 decides the landing.
 - **Copy rules.** One sentence each for what the home becomes (Your OVRFLO:
-  positions you can watch) and for Create as the launch into Self-Repaying
-  Loans and Fixed Returns. No protocol metrics: no TVL, no aggregate APR range,
-  no visitor counts, no demonstration loan, no synthetic instrument. Disconnected
-  is not empty and not an error. Never say "you have no positions". Never use
-  health-factor or liquidation language to explain why a visitor should connect.
+  positions you can watch) and for New position as the launch into
+  Self-Repaying Loans, Streams, and Fixed Returns. No protocol metrics: no TVL,
+  no aggregate APR range, no visitor counts, no demonstration loan, no
+  synthetic instrument. Disconnected is not empty and not an error. Never say
+  "you have no positions". Never use health-factor or liquidation language to
+  explain why a visitor should connect.
 - **Data authority.** `pure-client` — static copy. No chain read backs this surface.
 
 ## `UI-SHELL-ENTRY-SYNCING`

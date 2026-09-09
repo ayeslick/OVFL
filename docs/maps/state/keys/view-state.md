@@ -16,18 +16,20 @@ Unknown query keys must not crash. Pre-CS4 shapes have no compatibility redirect
 | Destination | URL | Notes |
 |---|---|---|
 | Your OVRFLO hub, empty, or incomplete scan | `/` | Incomplete scan does not change the path and does not write matrix query params from a provisional count |
-| Self-Repaying Loan collection | `/?type=loan` | Written only after complete hydration on `/` |
+| Self-Repaying Loan collection | `/?type=loan` | Written only after complete hydration on `/`. Waiting requests stay in this group |
 | Self-Repaying Loan detail | `/?lending=<market>&loan=<id>` | Identity stays `(lending, id)` |
+| Stream collection | `/?type=stream` | Wallet-held unpledged streams only |
+| Stream detail | `/?stream=<id>` | Held stream identity. An open loan for that stream rewrites to the loan |
 | Fixed Return collection | `/?type=fixed` | Written only after complete hydration on `/` |
 | Fixed Return detail | `/?lending=<market>&position=<id>` | Same identity rule as today |
-| Create (type not yet chosen) | `/create/` | Empty-portfolio Create and the Create nav item land here |
+| Create (type not yet chosen) | `/create/` | Empty-portfolio New position and the menu item land here |
 | Create Self-Repaying Loan | `/borrow/` | Existing page. `?stream=` and `?step=` stay |
+| Create Stream | `/create/stream/` | PT deposit plus hosted convert. Not a destination tab |
 | Create Fixed Return | `/supply/` | Existing page. `?step=` stays |
-| Wrap, unwrap, PT deposit | `/assets/` | Existing page |
 | Risk | `/risk/` | Unchanged |
 | Default vs Advanced | no path or query change | Disclosure only. `Return to Default` is the control. Browser Back does not toggle disclosure. Refresh lands in Default on the same destination |
 
-Query keys that survive: `?lending=`, `?loan=`, `?position=`, `?stream=`, `?step=`, `?type=` (`loan` or `fixed` only). Transaction checkpoints remain unenterable from history.
+Query keys that survive: `?lending=`, `?loan=`, `?position=`, `?stream=`, `?step=`, `?type=` (`loan`, `fixed`, or `stream`). Transaction checkpoints remain unenterable from history.
 
 ---
 
@@ -50,7 +52,7 @@ The URL no longer carries this key.
 
 ### `watch.portfolio-type`
 
-Collection type on `/` after complete hydration: `loan` · `fixed` · none.
+Collection type on `/` after complete hydration: `loan` · `fixed` · `stream` · none.
 
 - **trust_domain:** `pure-client`
 - **writers:**

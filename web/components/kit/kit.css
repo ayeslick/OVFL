@@ -13,8 +13,8 @@
 }
 
 .kit :is(button, a, input, [tabindex]):focus-visible {
-  outline: 2px solid var(--focus);
-  outline-offset: 2px;
+  outline: 3px solid var(--focus);
+  outline-offset: 5px;
 }
 
 .kit-vh {
@@ -51,10 +51,10 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: env(safe-area-inset-top) var(--space-lg) 0;
+  height: 106px;
+  padding: env(safe-area-inset-top) clamp(20px, 5vw, 78px) 0;
   border-bottom: 1px solid var(--border);
-  min-height: 56px;
-  gap: var(--space-md);
+  gap: 20px;
 }
 
 .kit-wordmark {
@@ -64,23 +64,27 @@
 }
 
 .kit-wordmark a {
-  font-weight: 700;
-  font-size: 20px;
-  letter-spacing: -0.02em;
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+  font-weight: 800;
+  font-size: 36px;
+  letter-spacing: -0.04em;
   background: transparent;
   border: 0;
   color: var(--ink);
   text-decoration: none;
-  padding: 14px 0;
-  display: inline-block;
+  padding: 0;
+}
+
+.kit-wordmark img {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
 }
 
 .kit-nav {
-  display: flex;
-  gap: 26px;
-  font-size: 13px;
-  font-weight: 500;
-  letter-spacing: 0;
+  display: none;
 }
 
 .kit-nav a,
@@ -149,26 +153,32 @@
 }
 
 .kit-shell-wallet {
-  font-size: 13px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-control);
-  padding: 7px 11px;
-  background: var(--surface);
+  font-size: 16px;
+  font-weight: 600;
+  border: 1px solid #ecf1f8;
+  border-radius: 999px;
+  padding: 12px 18px;
+  background: #f3f7fc;
+  min-height: 48px;
+  display: flex;
+  align-items: center;
 }
 
 .kit-mode {
   background: transparent;
   border: 0;
-  color: var(--primary);
-  font-size: 13px;
-  font-weight: 500;
+  color: var(--primary-hover);
+  font-size: 16px;
+  font-weight: 600;
   cursor: pointer;
   min-height: 44px;
   padding: 8px 4px;
 }
 
 .kit-shell-body {
-  padding: 0 var(--space-lg) var(--space-xl);
+  max-width: var(--hub-max);
+  margin: 0 auto;
+  padding: 44px clamp(22px, 5vw, 72px) 20px;
   overflow-x: hidden;
   min-width: 0;
 }
@@ -341,6 +351,10 @@ button.kit-type-card {
 
 .kit-medallion[data-identity="fixed"] {
   background: var(--fixed-return-soft);
+}
+
+.kit-medallion[data-identity="stream"] {
+  background: var(--loan-soft);
 }
 
 .kit-progress {
@@ -883,15 +897,15 @@ button.kit-type-card {
 }
 
 .kit-action {
-  border: 1px solid var(--control-border);
-  padding: 11px 20px;
-  font-size: 13px;
-  font-weight: 500;
-  letter-spacing: 0;
+  border: 0;
+  padding: 15px 28px;
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
   cursor: pointer;
-  background: var(--surface);
-  color: var(--primary);
-  min-height: 44px;
+  background: var(--primary-soft);
+  color: var(--primary-hover);
+  min-height: 54px;
   border-radius: var(--radius-control);
 }
 
@@ -977,7 +991,7 @@ button.kit-type-card {
   }
 
   .default-hub-types {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: 1fr 1fr 1fr;
   }
 }
 
@@ -1001,12 +1015,23 @@ button.kit-type-card {
   }
 
   .kit-shell-header {
-    padding: env(safe-area-inset-top) var(--space-md) 0;
+    height: 82px;
+    padding: env(safe-area-inset-top) 22px 0;
     flex-wrap: wrap;
   }
 
+  .kit-wordmark a {
+    font-size: 28px;
+    gap: 9px;
+  }
+
+  .kit-wordmark img {
+    width: 42px;
+    height: 42px;
+  }
+
   .kit-shell-body {
-    padding: 0 var(--space-md) var(--space-xl);
+    padding: 28px 22px 15px;
     padding-bottom: max(var(--space-xl), env(safe-area-inset-bottom));
   }
 

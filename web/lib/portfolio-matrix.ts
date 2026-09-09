@@ -18,6 +18,7 @@ export type PortfolioHydration = {
   loans: readonly PortfolioIdentity[];
   positions: readonly PortfolioIdentity[];
   waitingRequests?: readonly WaitingRequestIdentity[];
+  streams?: readonly bigint[];
 };
 
 export type PortfolioSurface =
@@ -53,31 +54,57 @@ export function ownsWaitingStream(
   return rows.some((row) => row.streamId === streamId);
 }
 
+export function ownsWalletStream(streams: readonly bigint[], streamId: bigint): boolean {
+  return streams.some((id) => id === streamId);
+}
+
+function typeCounts(
+  loans: readonly PortfolioIdentity[],
+  positions: readonly PortfolioIdentity[],
+  waitingRequests: readonly WaitingRequestIdentity[],
+  streams: readonly bigint[],
+) {
+  return {
+    loan: loans.length + waitingRequests.length,
+    fixed: positions.length,
+    stream: streams.length,
+  };
+}
+
 export function matrixFromCounts(
   loans: readonly PortfolioIdentity[],
   positions: readonly PortfolioIdentity[],
   waitingRequests: readonly WaitingRequestIdentity[] = [],
+  streams: readonly bigint[] = [],
 ): Exclude<PortfolioSurface, { kind: "incomplete" }> {
-  const loanType = loans.length + waitingRequests.length;
-  const positionCount = positions.length;
-  if (loanType === 0 && positionCount === 0) return { kind: "empty" };
-  if (loanType === 1 && positionCount === 0) {
-    const loan = loans[0];
-    if (loan) return { kind: "detail", selection: { kind: "loan", lending: loan.lending, id: loan.id } };
-    const request = waitingRequests[0];
-    if (!request) return { kind: "empty" };
-    return { kind: "detail", selection: { kind: "stream", id: request.streamId } };
+  const counts = typeCounts(loans, positions, waitingRequests, streams);
+  const present = (["loan", "fixed", "stream"] as const).filter((type) => counts[type] > 0);
+  const total = counts.loan + counts.fixed + counts.stream;
+  if (total === 0) return { kind: "empty" };
+  if (total === 1) {
+    if (counts.loan === 1) {
+      const loan = loans[0];
+      if (loan) return { kind: "detail", selection: { kind: "loan", lending: loan.lending, id: loan.id } };
+      const request = waitingRequests[0];
+      if (!request) return { kind: "empty" };
+      return { kind: "detail", selection: { kind: "stream", id: request.streamId } };
+    }
+    if (counts.fixed === 1) {
+      const position = positions[0];
+      if (!position) return { kind: "empty" };
+      return {
+        kind: "detail",
+        selection: { kind: "position", lending: position.lending, id: position.id },
+      };
+    }
+    const streamId = streams[0];
+    if (streamId === undefined) return { kind: "empty" };
+    return { kind: "detail", selection: { kind: "stream", id: streamId } };
   }
-  if (positionCount === 1 && loanType === 0) {
-    const position = positions[0];
-    if (!position) return { kind: "empty" };
-    return {
-      kind: "detail",
-      selection: { kind: "position", lending: position.lending, id: position.id },
-    };
+  if (present.length === 1) {
+    const only = present[0];
+    if (only) return { kind: "collection", type: only };
   }
-  if (loanType > 1 && positionCount === 0) return { kind: "collection", type: "loan" };
-  if (positionCount > 1 && loanType === 0) return { kind: "collection", type: "fixed" };
   return { kind: "hub" };
 }
 
@@ -94,11 +121,9 @@ function ownedSelection(
   ) {
     return selection;
   }
-  if (
-    selection.kind === "stream" &&
-    ownsWaitingStream(hydration.waitingRequests ?? [], selection.id)
-  ) {
-    return selection;
+  if (selection.kind === "stream") {
+    if (ownsWaitingStream(hydration.waitingRequests ?? [], selection.id)) return selection;
+    if (ownsWalletStream(hydration.streams ?? [], selection.id)) return selection;
   }
   return null;
 }
@@ -108,16 +133,12 @@ function collectionFromType(
   type: PortfolioType | null,
 ): PortfolioType | null {
   const waiting = hydration.waitingRequests ?? [];
-  const loanType = hydration.loans.length + waiting.length;
-  if (type === "loan" && loanType > 0) {
-    if (loanType === 1 && hydration.positions.length === 0) return null;
-    return "loan";
-  }
-  if (type === "fixed" && hydration.positions.length > 0) {
-    if (hydration.positions.length === 1 && loanType === 0) return null;
-    return "fixed";
-  }
-  return null;
+  const streams = hydration.streams ?? [];
+  const counts = typeCounts(hydration.loans, hydration.positions, waiting, streams);
+  const present = (["loan", "fixed", "stream"] as const).filter((row) => counts[row] > 0);
+  if (type === null || counts[type] === 0) return null;
+  if (present.length === 1 && counts[type] === 1) return null;
+  return type;
 }
 
 export function classifyPortfolio(
@@ -126,17 +147,12 @@ export function classifyPortfolio(
 ): PortfolioSurface {
   if (!hydration.complete) return { kind: "incomplete" };
   const waiting = hydration.waitingRequests ?? [];
-  if (url.selection.kind === "stream") {
-    if (ownsWaitingStream(waiting, url.selection.id)) {
-      return { kind: "detail", selection: url.selection };
-    }
-    return matrixFromCounts(hydration.loans, hydration.positions, waiting);
-  }
+  const streams = hydration.streams ?? [];
   const owned = ownedSelection(hydration, url.selection);
   if (owned) return { kind: "detail", selection: owned };
   const collectionType = collectionFromType(hydration, url.type);
   if (collectionType) return { kind: "collection", type: collectionType };
-  return matrixFromCounts(hydration.loans, hydration.positions, waiting);
+  return matrixFromCounts(hydration.loans, hydration.positions, waiting, streams);
 }
 
 export function applyPortfolioSearch(

@@ -47,6 +47,24 @@ describe("matrixFromCounts", () => {
   it("routes mixed types to the hub", () => {
     expect(matrixFromCounts([loan(1n)], [loan(2n)])).toEqual({ kind: "hub" });
   });
+
+  it("routes one wallet stream to stream detail", () => {
+    expect(matrixFromCounts([], [], [], [9n])).toEqual({
+      kind: "detail",
+      selection: { kind: "stream", id: 9n },
+    });
+  });
+
+  it("routes multiple wallet streams to the stream collection", () => {
+    expect(matrixFromCounts([], [], [], [9n, 10n])).toEqual({
+      kind: "collection",
+      type: "stream",
+    });
+  });
+
+  it("routes a loan plus a stream to the hub", () => {
+    expect(matrixFromCounts([loan(1n)], [], [], [9n])).toEqual({ kind: "hub" });
+  });
 });
 
 describe("classifyPortfolio", () => {

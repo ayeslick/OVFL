@@ -58,6 +58,14 @@ describe("URL / localStorage parsers", () => {
       loan: null,
       stream: null,
     });
+    expect(parseWatchSearch("?type=stream")).toEqual({
+      lens: null,
+      type: "stream",
+      lending: null,
+      position: null,
+      loan: null,
+      stream: null,
+    });
     expect(parseTickParam("1000")).toBe(1000);
     expect(parseTickParam("99.5")).toBeNull();
     expect(parseTickParam("99999")).toBeNull();

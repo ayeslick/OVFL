@@ -3,7 +3,7 @@
 import { isAddressEqual, type Address } from "viem";
 import { useConnection, useReadContract } from "wagmi";
 import { ActionButton } from "@/components/kit/ActionButton";
-import { SurfaceHeading } from "@/components/kit/SurfaceHeading";
+import { loanCapsuleSegments } from "@/lib/capsule-segments";
 import { useApprovalWriteFlows } from "@/hooks/useApprovalWriteFlows";
 import { ovrfloLendingAbi, ovrfloRequestBookAbi } from "@/lib/abis";
 import type { DisclosureLevel } from "@/lib/disclosure";
@@ -16,6 +16,7 @@ import {
 import type { RestingRequestRow } from "@/lib/protocol/request-book";
 import type { MarketInfo } from "@/lib/types";
 import { userFacingError } from "@/lib/errors";
+import { DetailShell } from "./PortfolioViews";
 import "./watch.css";
 
 export function WaitingRequestDetail({
@@ -95,32 +96,31 @@ export function WaitingRequestDetail({
       data-region="waiting-request"
       data-named-state={spec.id}
     >
-      <SurfaceHeading>Waiting</SurfaceHeading>
       {liveCopy ? (
         <p className="kit-vh" role="status" aria-live="polite" aria-atomic="true" data-ui="UI-WATCH-LIVE">
           {liveCopy}
         </p>
       ) : null}
-      <div className="kit-hero">
-        <span className="kit-hero-kicker">{spec.label.toUpperCase()}</span>
-        <p className="watch-hero-meta">STREAM #{request.streamId.toString()}</p>
-      </div>
-      <p className="watch-note">{WAITING_FOR_LIQUIDITY_COPY}</p>
-      {retiredRouter ? <p className="watch-note">{spec.copy}</p> : null}
-      <dl className="watch-facts">
-        <div className="watch-fact">
-          <dt>TARGET</dt>
-          <dd>{`${formatTruncatedDecimal(request.targetBorrow, 18, 5)} ${symbol}`}</dd>
-        </div>
-        <div className="watch-fact">
-          <dt>APR</dt>
-          <dd>{formatAprBps(request.aprBps)}</dd>
-        </div>
-        <div className="watch-fact">
-          <dt>STREAM</dt>
-          <dd>{`#${request.streamId.toString()}`}</dd>
-        </div>
-      </dl>
+      <DetailShell
+        title="Waiting"
+        status="Waiting"
+        segments={loanCapsuleSegments(
+          {
+            waiting: true,
+            waitingAmount: request.targetBorrow,
+            obligation: 0n,
+            outstanding: 0n,
+          },
+          (value) => formatTruncatedDecimal(value, 18, 2),
+        )}
+        facts={[
+          { label: "Target", value: `${formatTruncatedDecimal(request.targetBorrow, 18, 5)} ${symbol}` },
+          { label: "APR", value: formatAprBps(request.aprBps) },
+          { label: "Stream", value: `#${request.streamId.toString()}` },
+        ]}
+        note={retiredRouter ? spec.copy : WAITING_FOR_LIQUIDITY_COPY}
+        actions={
+          <>
       {actionTx.error && !actionTx.isRejected ? (
         <p className="kit-field-error">{userFacingError(actionTx.error)}</p>
       ) : null}
@@ -194,6 +194,9 @@ export function WaitingRequestDetail({
           ) : null}
         </div>
       ) : null}
+          </>
+        }
+      />
     </article>
   );
 }
